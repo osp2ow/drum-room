@@ -245,6 +245,7 @@
   .slot-cell.other{background:var(--surface-3);border-color:var(--border);}
   .slot-cell.selected{background:var(--brass);border-color:var(--brass);color:#FFFFFF;font-weight:800;cursor:pointer;box-shadow:0 3px 8px rgba(47,191,175,0.35);}
   .slot-cell.blocked{opacity:0.4;}
+  .slot-cell.past{background:var(--surface-3);border-color:var(--border);color:var(--text-faint);opacity:0.55;}
   .slot-cell.closed{background:var(--surface-3);border-color:var(--border);color:var(--text-faint);}
   .status-badge{
     display:inline-flex;align-items:center;padding:8px 14px;border-radius:100px;
@@ -868,8 +869,12 @@ function ReserveTab({ student, blocks }){
   const usedSlots = existingSlots.length + draftSlots.length;
   const remainMin = Math.max(0, (limitSlots - usedSlots) * 30);
 
+  const isToday = selDate === fmtDate(new Date());
+  const nowMin = (()=>{ const n = new Date(); return n.getHours()*60 + n.getMinutes(); })();
+
   function slotState(room, time){
     const s = toMin(time), e = s + 30;
+    if(isToday && s < nowMin) return 'past';
     const isOther = dayReservations.some(r => Number(r.room)===room && r.studentId!==student.id && toMin(r.start)<e && s<toMin(r.end));
     if(isOther) return 'other';
     const isClosed = blocks.some(b => Number(b.room)===room && b.day===dow && toMin(b.start)<e && s<toMin(b.end));
@@ -1180,8 +1185,11 @@ function StatusTab({ student, blocks }){
     return ()=>unsub();
   }, [todayStr]);
 
+  const nowMin = (()=>{ const n = new Date(); return n.getHours()*60 + n.getMinutes(); })();
+
   function slotStatus(room, time){
     const s = toMin(time), e = s + 30;
+    if(s < nowMin) return 'past';
     const booked = dayReservations.some(r => Number(r.room)===room && toMin(r.start)<e && s<toMin(r.end));
     if(booked) return 'other';
     const closed = blocks.some(b => Number(b.room)===room && b.day===todayDow && toMin(b.start)<e && s<toMin(b.end));
@@ -1200,7 +1208,7 @@ function StatusTab({ student, blocks }){
     <div className="screen">
       <div className="eyebrow">TODAY STATUS</div>
       <h1 className="page-title">오늘의 예약 현황</h1>
-      <p className="page-sub">{fmtKDate(dateObj)} 기준, 방을 선택해서 예약 가능 여부를 확인해보세요.</p>
+      <p className="page-sub" style={{color:'var(--text)',fontWeight:600}}>{fmtKDate(dateObj)} 기준, 비어있는 방을 확인하세요.</p>
 
       {!hours ? (
         <div className="info-box">일요일은 학원 휴무일이에요.</div>
