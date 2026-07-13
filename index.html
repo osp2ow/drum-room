@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#14151A" />
+<title>주니퍼 실용음악학원 · DRUM</title>
+
+<!-- ============================================================
+  설정 안내 (원장님 꼭 읽어주세요)
+  1) 아래 firebaseConfig 를 본인 Firebase 프로젝트 값으로 교체하세요.
+     - 기존에 만든 Firebase 프로젝트(드럼코치 등)를 재사용해도 됩니다.
+       이 앱은 juniper_ 로 시작하는 컬렉션만 사용하므로 기존 데이터와 겹치지 않습니다.
+  2) Firestore 보안 규칙(Firestore Database > 규칙)에 아래 내용을 넣어주세요.
+     (테스트/소규모 운영용 간단 규칙입니다 - 필요시 나중에 강화하세요)
+
+     rules_version = '2';
+     service cloud.firestore {
+       match /databases/{database}/documents {
+         match /juniper_{collection}/{doc} {
+           allow read, write: if true;
+         }
+       }
+     }
+
+  3) 관리자 비밀번호는 아래 ADMIN_PASSWORD 값을 원하는 값으로 바꿔서 사용하세요.
+============================================================= -->
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --ink:#14151A;
+    --surface:#1C1E26;
+    --surface-2:#242631;
+    --surface-3:#2C2F3C;
+    --border:#34363F;
+    --brass:#C9A227;
+    --brass-bright:#E4C04A;
+    --brass-soft:rgba(201,162,39,0.14);
+    --amber:#E8935A;
+    --rec:#E1483C;
+    --rec-soft:rgba(225,72,60,0.16);
+    --text:#F1EEE6;
+    --text-muted:#9A9CA6;
+    --text-faint:#5C5E68;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-body:'Inter',sans-serif;
+    --font-mono:'Space Mono',monospace;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--ink);}
+  body{
+    font-family:var(--font-body);
+    color:var(--text);
+    overscroll-behavior-y:none;
+  }
+  #root{
+    max-width:480px;
+    margin:0 auto;
+    min-height:100vh;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(201,162,39,0.08), transparent 60%),
+      var(--ink);
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+  button{font-family:inherit;}
+  input,select,textarea{font-family:inherit;}
+
+  ::-webkit-scrollbar{display:none;}
+  * { scrollbar-width:none; }
+
+  .app-header{
+    padding:calc(18px + var(--safe-t)) 20px 16px;
+    display:flex;align-items:center;gap:12px;
+    border-bottom:1px solid var(--border);
+    position:sticky;top:0;background:rgba(20,21,26,0.92);backdrop-filter:blur(10px);
+    z-index:20;
+  }
+  .logo-mark{
+    width:38px;height:38px;border-radius:11px;
+    background:linear-gradient(155deg, var(--surface-3), var(--surface));
+    border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .header-text .brand{font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:0.02em;}
+  .header-text .sub{font-family:var(--font-mono);font-size:10.5px;color:var(--brass);letter-spacing:0.18em;margin-top:1px;}
+  .header-right{margin-left:auto;font-size:12px;color:var(--text-muted);text-align:right;}
+
+  .screen{flex:1;padding:20px 20px calc(96px + var(--safe-b));animation:fadeIn .25s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+  .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.14em;color:var(--brass);text-transform:uppercase;margin-bottom:6px;}
+  h1.page-title{font-family:var(--font-display);font-size:23px;font-weight:700;margin:0 0 4px;letter-spacing:-0.01em;}
+  .page-sub{font-size:13px;color:var(--text-muted);margin:0 0 22px;line-height:1.5;}
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:18px;
+    margin-bottom:14px;
+  }
+  .card-title{font-family:var(--font-display);font-size:15px;font-weight:600;margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+
+  .btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    background:var(--brass);color:#1A1608;
+    font-family:var(--font-display);font-weight:700;font-size:14.5px;
+    border:none;border-radius:12px;padding:14px 18px;
+    cursor:pointer;width:100%;
+    transition:transform .12s ease, filter .12s ease;
+  }
+  .btn:active{transform:scale(0.98);filter:brightness(0.94);}
+  .btn:disabled{background:var(--surface-3);color:var(--text-faint);cursor:not-allowed;}
+  .btn-ghost{
+    background:transparent;border:1px solid var(--border);color:var(--text);
+  }
+  .btn-danger{background:var(--rec);color:#fff;}
+  .btn-sm{padding:9px 14px;font-size:12.5px;border-radius:10px;width:auto;}
+
+  .input-group{margin-bottom:14px;}
+  .input-label{font-size:12px;color:var(--text-muted);margin-bottom:6px;display:block;font-weight:500;}
+  .input{
+    width:100%;background:var(--surface-2);border:1px solid var(--border);
+    color:var(--text);border-radius:11px;padding:13px 14px;font-size:14.5px;outline:none;
+  }
+  .input:focus{border-color:var(--brass);}
+  select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239A9CA6' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;}
+
+  .toggle-row{display:flex;gap:8px;}
+  .toggle-opt{
+    flex:1;text-align:center;padding:12px;border-radius:11px;border:1px solid var(--border);
+    background:var(--surface-2);color:var(--text-muted);font-size:13.5px;font-weight:600;cursor:pointer;
+  }
+  .toggle-opt.active{border-color:var(--brass);color:var(--brass-bright);background:var(--brass-soft);}
+
+  .tag{
+    display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
+    padding:4px 9px;border-radius:100px;font-family:var(--font-mono);letter-spacing:0.02em;
+  }
+  .tag-exam{background:var(--rec-soft);color:#F0796E;}
+  .tag-hobby{background:var(--brass-soft);color:var(--brass-bright);}
+
+  .error-box{background:var(--rec-soft);border:1px solid rgba(225,72,60,0.35);color:#F0968D;font-size:12.5px;padding:11px 13px;border-radius:10px;margin-bottom:14px;line-height:1.5;}
+  .info-box{background:var(--brass-soft);border:1px solid rgba(201,162,39,0.3);color:var(--brass-bright);font-size:12.5px;padding:11px 13px;border-radius:10px;margin-bottom:14px;line-height:1.5;}
+
+  .empty-state{text-align:center;padding:40px 16px;color:var(--text-faint);}
+  .empty-state .icon{font-size:26px;margin-bottom:8px;opacity:0.5;}
+  .empty-state p{font-size:13px;margin:0;line-height:1.6;}
+
+  .auth-wrap{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:32px 26px calc(32px + var(--safe-b));}
+  .auth-logo{display:flex;flex-direction:column;align-items:center;margin-bottom:36px;}
+  .auth-logo .logo-mark{width:58px;height:58px;border-radius:16px;margin-bottom:14px;}
+  .auth-logo .brand{font-family:var(--font-display);font-size:19px;font-weight:700;}
+  .auth-logo .sub{font-family:var(--font-mono);font-size:11px;color:var(--brass);letter-spacing:0.22em;margin-top:4px;}
+
+  .auth-tabs{display:flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:12px;margin-bottom:22px;}
+  .auth-tab{flex:1;text-align:center;padding:10px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--text-muted);cursor:pointer;}
+  .auth-tab.active{background:var(--surface-3);color:var(--text);}
+
+  .admin-link{text-align:center;margin-top:22px;font-size:12px;color:var(--text-faint);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+
+  .tabbar{
+    position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+    width:100%;max-width:480px;
+    display:flex;background:rgba(28,30,38,0.94);backdrop-filter:blur(14px);
+    border-top:1px solid var(--border);
+    padding:9px 6px calc(9px + var(--safe-b));
+    z-index:30;
+  }
+  .tab-item{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
+    padding:6px 2px;color:var(--text-faint);cursor:pointer;
+  }
+  .tab-item.active{color:var(--brass-bright);}
+  .tab-item svg{width:21px;height:21px;}
+  .tab-item span{font-size:10.5px;font-weight:600;font-family:var(--font-mono);letter-spacing:0.02em;}
+
+  .date-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;}
+  .date-chip{
+    flex-shrink:0;width:52px;padding:10px 0;border-radius:13px;text-align:center;
+    background:var(--surface);border:1px solid var(--border);cursor:pointer;
+  }
+  .date-chip.active{background:var(--brass);border-color:var(--brass);}
+  .date-chip .dow{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);}
+  .date-chip.active .dow{color:#3a2f06;}
+  .date-chip .num{font-family:var(--font-display);font-size:16px;font-weight:700;margin-top:2px;}
+  .date-chip.active .num{color:#1A1608;}
+  .date-chip.today .num::after{content:'';display:block;width:4px;height:4px;border-radius:50%;background:var(--rec);margin:3px auto 0;}
+  .date-chip.active.today .num::after{background:#1A1608;}
+
+  .room-tabs{display:flex;gap:7px;margin-bottom:16px;}
+  .room-tab{
+    flex:1;text-align:center;padding:11px 4px;border-radius:11px;border:1px solid var(--border);
+    background:var(--surface);cursor:pointer;
+  }
+  .room-tab.active{border-color:var(--brass);background:var(--brass-soft);}
+  .room-tab .rn{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);}
+  .room-tab.active .rn{color:var(--brass);}
+  .room-tab .rt{font-family:var(--font-display);font-weight:700;font-size:14px;margin-top:1px;}
+
+  .slot-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:6px;}
+  .slot-cell{
+    aspect-ratio:1;border-radius:7px;border:1px solid var(--border);
+    background:var(--surface-2);display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-mono);font-size:8.5px;color:var(--text-faint);position:relative;
+  }
+  .slot-cell.free{border-color:rgba(201,162,39,0.3);}
+  .slot-cell.mine{background:var(--brass-soft);border-color:var(--brass);color:var(--brass-bright);}
+  .slot-cell.other{background:var(--rec-soft);border-color:rgba(225,72,60,0.35);color:#F0968D;}
+  .slot-cell .dot{width:4px;height:4px;border-radius:50%;background:var(--rec);position:absolute;top:4px;right:4px;}
+  .legend{display:flex;gap:14px;margin-bottom:20px;flex-wrap:wrap;}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);}
+  .legend-dot{width:9px;height:9px;border-radius:3px;}
+
+  .budget-bar-wrap{margin-bottom:18px;}
+  .budget-bar-track{height:8px;background:var(--surface-2);border-radius:100px;overflow:hidden;margin-top:8px;}
+  .budget-bar-fill{height:100%;background:linear-gradient(90deg,var(--brass),var(--brass-bright));border-radius:100px;transition:width .3s ease;}
+
+  .dur-row{display:flex;gap:8px;}
+  .dur-opt{
+    flex:1;padding:12px;border-radius:11px;border:1px solid var(--border);background:var(--surface-2);
+    text-align:center;cursor:pointer;color:var(--text-muted);font-weight:600;font-size:13.5px;
+  }
+  .dur-opt.active{border-color:var(--brass);color:var(--brass-bright);background:var(--brass-soft);}
+  .dur-opt.disabled{opacity:0.35;pointer-events:none;}
+
+  .res-row{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:13px 14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);
+    margin-bottom:9px;
+  }
+  .res-row .room-badge{
+    font-family:var(--font-mono);font-size:11px;color:var(--brass);background:var(--brass-soft);
+    padding:3px 8px;border-radius:7px;margin-right:10px;flex-shrink:0;
+  }
+  .res-row .res-time{font-family:var(--font-mono);font-size:13.5px;font-weight:700;}
+  .res-row .res-sub{font-size:11px;color:var(--text-faint);margin-top:2px;}
+  .res-row .cancel-x{color:var(--text-faint);font-size:18px;cursor:pointer;padding:4px 8px;}
+
+  .notice-item{padding:16px;border-radius:14px;background:var(--surface);border:1px solid var(--border);margin-bottom:12px;}
+  .notice-item.important{border-color:rgba(201,162,39,0.45);background:linear-gradient(160deg, var(--brass-soft), var(--surface) 60%);}
+  .notice-title{font-family:var(--font-display);font-weight:700;font-size:14.5px;margin-bottom:6px;display:flex;align-items:center;gap:7px;}
+  .notice-date{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);margin-bottom:8px;}
+  .notice-body{font-size:13px;color:var(--text-muted);line-height:1.65;white-space:pre-wrap;}
+
+  .schedule-row{display:flex;align-items:center;padding:14px 0;border-bottom:1px solid var(--border);}
+  .schedule-row:last-child{border-bottom:none;}
+  .schedule-day{
+    width:38px;height:38px;border-radius:11px;background:var(--surface-2);
+    display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:13px;
+    margin-right:12px;flex-shrink:0;color:var(--text-muted);
+  }
+  .schedule-day.today{background:var(--brass);color:#1A1608;}
+  .schedule-time{font-family:var(--font-mono);font-size:14.5px;font-weight:700;}
+
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(10,10,13,0.7);backdrop-filter:blur(3px);
+    display:flex;align-items:flex-end;justify-content:center;z-index:100;
+    animation:fadeIn .18s ease;
+  }
+  .modal-sheet{
+    width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;
+    padding:22px 20px calc(24px + var(--safe-b));max-height:86vh;overflow-y:auto;
+    border-top:1px solid var(--border);
+  }
+  .modal-handle{width:36px;height:4px;background:var(--border);border-radius:100px;margin:0 auto 18px;}
+  .modal-title{font-family:var(--font-display);font-weight:700;font-size:17px;margin-bottom:4px;}
+  .modal-close-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .icon-btn{color:var(--text-faint);font-size:20px;cursor:pointer;padding:4px;}
+
+  .search-input-wrap{margin-bottom:14px;}
+  .list-item-row{
+    display:flex;align-items:center;justify-content:space-between;padding:13px 14px;
+    background:var(--surface-2);border:1px solid var(--border);border-radius:12px;margin-bottom:9px;cursor:pointer;
+  }
+  .list-item-row .name{font-weight:600;font-size:14px;}
+  .list-item-row .meta{font-size:11px;color:var(--text-faint);margin-top:3px;}
+  .chev{color:var(--text-faint);}
+
+  .mini-add-row{display:flex;gap:7px;margin-bottom:8px;align-items:center;}
+  .mini-add-row .input{flex:1;padding:10px 12px;font-size:13px;}
+  .remove-chip{color:var(--rec);font-size:18px;cursor:pointer;padding:0 6px;flex-shrink:0;}
+
+  .day-pill-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+  .day-pill{width:34px;height:34px;border-radius:9px;background:var(--surface-2);border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;}
+  .day-pill.active{background:var(--brass);color:#1A1608;border-color:var(--brass);}
+
+  .loading-spin{
+    width:22px;height:22px;border-radius:50%;border:2.5px solid var(--surface-3);border-top-color:var(--brass);
+    animation:spin .7s linear infinite;margin:40px auto;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .checkbox-row{display:flex;align-items:center;gap:9px;padding:12px 0;cursor:pointer;}
+  .checkbox-box{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+  .checkbox-box.checked{background:var(--brass);border-color:var(--brass);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo, useCallback } = React;
+
+/* ============================================================
+   FIREBASE CONFIG - 여기를 본인 프로젝트 값으로 교체하세요
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyCb5pipY3Q1dl6BxpP7ZmUU3hbEj7Q1_Qg",
+  authDomain: "drum-practice-room.firebaseapp.com",
+  projectId: "drum-practice-room",
+  storageBucket: "drum-practice-room.firebasestorage.app",
+  messagingSenderId: "445111225694",
+  appId: "1:445111225694:web:571c88b2b10ff83931d3cf"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const FIREBASE_NOT_CONFIGURED = firebaseConfig.apiKey === "YOUR_API_KEY";
+
+function withTimeout(promise, ms=12000){
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=> setTimeout(()=> reject(new Error('TIMEOUT')), ms))
+  ]);
+}
+
+const ADMIN_PASSWORD = "juniper2026"; // 원장님 비밀번호 - 원하는 값으로 변경하세요
+
+const COL_STUDENTS = "juniper_students";
+const COL_RESERVATIONS = "juniper_reservations";
+const COL_NOTICES = "juniper_notices";
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const DOW = ['일','월','화','수','목','금','토'];
+const ROOMS = [1,2,3,4];
+
+function pad(n){ return n < 10 ? '0'+n : ''+n; }
+function fmtDate(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function addDays(d,n){ const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function toMin(t){ const [h,m] = t.split(':').map(Number); return h*60+m; }
+function toTime(min){ const h = Math.floor(min/60), m = min%60; return pad(h)+':'+pad(m); }
+function fmtKDate(d){ return (d.getMonth()+1)+'월 '+d.getDate()+'일 ('+DOW[d.getDay()]+')'; }
+
+function getOperatingHours(dateObj){
+  const day = dateObj.getDay();
+  if(day === 0) return null; // 일요일 휴무
+  if(day === 6) return { start:'13:00', end:'19:00' };
+  return { start:'13:00', end:'22:00' };
+}
+
+function generateHalfHourSlots(hours){
+  if(!hours) return [];
+  const slots = [];
+  let cur = toMin(hours.start);
+  const end = toMin(hours.end);
+  while(cur < end){ slots.push(toTime(cur)); cur += 30; }
+  return slots;
+}
+
+function hasOverlap(reservations, room, start, end){
+  const s = toMin(start), e = toMin(end);
+  return reservations.some(r => Number(r.room) === Number(room) && toMin(r.start) < e && s < toMin(r.end));
+}
+
+// 예약 규칙 검증: type = 'hobby' | 'exam'
+function validateReservation(type, existingTodayForStudent, room, start, end){
+  const s = toMin(start), e = toMin(end), dur = e - s;
+  const dailyLimit = type === 'exam' ? 180 : 60;
+  const usedMin = existingTodayForStudent.reduce((sum,r)=> sum + (toMin(r.end)-toMin(r.start)), 0);
+
+  if(usedMin + dur > dailyLimit){
+    return { ok:false, msg: `오늘 예약 가능한 시간(${dailyLimit/60}시간)을 초과해요. 남은 시간: ${Math.max(0,dailyLimit-usedMin)}분` };
+  }
+
+  if(type === 'hobby'){
+    if(dur > 60) return { ok:false, msg:'취미생은 1회 최대 1시간까지 예약할 수 있어요.' };
+    return { ok:true };
+  }
+
+  // 입시생 규칙
+  if(dur > 120) return { ok:false, msg:'1회 예약은 최대 2시간까지 가능해요.' };
+
+  const sameRoom = existingTodayForStudent.filter(r => Number(r.room) === Number(room));
+
+  for(const r of sameRoom){
+    const rs = toMin(r.start), re = toMin(r.end);
+    if(re <= s){ const gap = s - re; if(gap > 0 && gap < 30) return { ok:false, msg:'같은 방을 이어서 쓰려면 최소 30분 휴식이 필요해요. 다른 방을 이용해보세요.' }; }
+    if(e <= rs){ const gap = rs - e; if(gap > 0 && gap < 30) return { ok:false, msg:'같은 방을 이어서 쓰려면 최소 30분 휴식이 필요해요. 다른 방을 이용해보세요.' }; }
+  }
+
+  const touching = sameRoom.filter(r => toMin(r.end) === s || toMin(r.start) === e);
+  if(touching.length){
+    const blockMin = touching.reduce((sum,r)=> sum + (toMin(r.end)-toMin(r.start)), 0) + dur;
+    if(blockMin > 120) return { ok:false, msg:'같은 방에서는 최대 2시간까지 연속 이용할 수 있어요. 30분 휴식 후 예약하거나 다른 방을 이용해주세요.' };
+  }
+
+  return { ok:true };
+}
+
+/* ============================================================
+   ICONS
+   ============================================================ */
+const Icon = {
+  home: (p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/></svg>),
+  cal: (p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}><rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8 3.5v3M16 3.5v3"/></svg>),
+  bell: (p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}><path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>),
+  user: (p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1-4 4-6 7-6s6 2 7 6"/></svg>),
+};
+
+function LogoMark(){
+  return (
+    <div className="logo-mark">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="#C9A227" strokeWidth="1.4"/>
+        <path d="M7 7l10 10M17 7 7 17" stroke="#E4C04A" strokeWidth="1.8" strokeLinecap="round"/>
+        <circle cx="7" cy="7" r="1.4" fill="#E4C04A"/>
+        <circle cx="17" cy="17" r="1.4" fill="#E4C04A"/>
+      </svg>
+    </div>
+  );
+}
+
+/* ============================================================
+   APP HEADER
+   ============================================================ */
+function AppHeader({ subtitle, right }){
+  return (
+    <div className="app-header">
+      <LogoMark/>
+      <div className="header-text">
+        <div className="brand">주니퍼 실용음악학원</div>
+        <div className="sub">{subtitle || 'DRUM SESSION'}</div>
+      </div>
+      {right && <div className="header-right">{right}</div>}
+    </div>
+  );
+}
+
+/* ============================================================
+   AUTH SCREEN (학생 로그인/회원가입 + 관리자 진입)
+   ============================================================ */
+function AuthScreen({ onStudentLogin, onGoAdmin }){
+  const [mode, setMode] = useState('login'); // login | signup
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [type, setType] = useState('hobby');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function handleLogin(){
+    setErr('');
+    if(!name.trim() || !phone.trim()){ setErr('이름과 비밀번호를 모두 입력해주세요.'); return; }
+    setBusy(true);
+    try{
+      const snap = await withTimeout(db.collection(COL_STUDENTS).where('name','==',name.trim()).get());
+      const doc = snap.docs.find(d => d.data().phoneLast4 === phone.trim());
+      if(!doc){ setErr('이름 또는 비밀번호가 일치하지 않아요.'); setBusy(false); return; }
+      const student = { id: doc.id, ...doc.data() };
+      localStorage.setItem('juniper_session', JSON.stringify({ type:'student', studentId: student.id }));
+      onStudentLogin(student);
+    }catch(e){
+      setErr(e.message==='TIMEOUT' ? 'Firebase 서버에 연결할 수 없어요. firebaseConfig 설정과 인터넷 연결을 확인해주세요.' : '로그인 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.');
+    }
+    setBusy(false);
+  }
+
+  async function handleSignup(){
+    setErr('');
+    if(!name.trim() || !phone.trim()){ setErr('이름과 비밀번호를 모두 입력해주세요.'); return; }
+    if(!/^\d{4}$/.test(phone.trim())){ setErr('비밀번호는 휴대폰 뒷자리 4자리 숫자로 입력해주세요.'); return; }
+    setBusy(true);
+    try{
+      const existing = await withTimeout(db.collection(COL_STUDENTS).where('name','==',name.trim()).get());
+      if(!existing.empty){ setErr('이미 등록된 이름이에요. 동명이인이라면 원장님께 문의해주세요.'); setBusy(false); return; }
+      const docRef = await withTimeout(db.collection(COL_STUDENTS).add({
+        name: name.trim(), phoneLast4: phone.trim(), type, schedule: [],
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }));
+      const student = { id: docRef.id, name: name.trim(), phoneLast4: phone.trim(), type, schedule: [] };
+      localStorage.setItem('juniper_session', JSON.stringify({ type:'student', studentId: student.id }));
+      onStudentLogin(student);
+    }catch(e){
+      setErr(e.message==='TIMEOUT' ? 'Firebase 서버에 연결할 수 없어요. firebaseConfig 설정과 인터넷 연결을 확인해주세요.' : '회원가입 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.');
+    }
+    setBusy(false);
+  }
+
+  return (
+    <div className="auth-wrap">
+      <div className="auth-logo">
+        <div className="logo-mark">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="#C9A227" strokeWidth="1.4"/>
+            <path d="M7 7l10 10M17 7 7 17" stroke="#E4C04A" strokeWidth="1.8" strokeLinecap="round"/>
+            <circle cx="7" cy="7" r="1.4" fill="#E4C04A"/>
+            <circle cx="17" cy="17" r="1.4" fill="#E4C04A"/>
+          </svg>
+        </div>
+        <div className="brand">주니퍼 실용음악학원</div>
+        <div className="sub">DRUM SESSION</div>
+      </div>
+
+      <div className="auth-tabs">
+        <div className={"auth-tab" + (mode==='login'?' active':'')} onClick={()=>{setMode('login');setErr('');}}>로그인</div>
+        <div className={"auth-tab" + (mode==='signup'?' active':'')} onClick={()=>{setMode('signup');setErr('');}}>회원가입</div>
+      </div>
+
+      {err && <div className="error-box">{err}</div>}
+
+      <div className="input-group">
+        <label className="input-label">이름 (아이디)</label>
+        <input className="input" placeholder="예: 김주니" value={name} onChange={e=>setName(e.target.value)} />
+      </div>
+      <div className="input-group">
+        <label className="input-label">휴대폰 뒷자리 4자리 (비밀번호)</label>
+        <input className="input" placeholder="예: 1234" inputMode="numeric" maxLength="4" value={phone} onChange={e=>setPhone(e.target.value.replace(/\D/g,''))} />
+      </div>
+
+      {mode === 'signup' && (
+        <div className="input-group">
+          <label className="input-label">수강 유형</label>
+          <div className="toggle-row">
+            <div className={"toggle-opt"+(type==='hobby'?' active':'')} onClick={()=>setType('hobby')}>취미생</div>
+            <div className={"toggle-opt"+(type==='exam'?' active':'')} onClick={()=>setType('exam')}>입시생</div>
+          </div>
+        </div>
+      )}
+
+      <button className="btn" disabled={busy} onClick={mode==='login'?handleLogin:handleSignup} style={{marginTop:6}}>
+        {busy ? '처리 중...' : (mode==='login' ? '로그인' : '가입하고 시작하기')}
+      </button>
+
+      <div className="admin-link" onClick={onGoAdmin}>원장님이신가요? 관리자로 로그인</div>
+    </div>
+  );
+}
+
+function AdminLoginScreen({ onAdminLogin, onBack }){
+  const [pw, setPw] = useState('');
+  const [err, setErr] = useState('');
+  function submit(){
+    if(pw === ADMIN_PASSWORD){
+      localStorage.setItem('juniper_session', JSON.stringify({ type:'admin' }));
+      onAdminLogin();
+    } else setErr('비밀번호가 일치하지 않아요.');
+  }
+  return (
+    <div className="auth-wrap">
+      <div className="auth-logo">
+        <div className="logo-mark"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#C9A227" strokeWidth="1.4"/><path d="M7 7l10 10M17 7 7 17" stroke="#E4C04A" strokeWidth="1.8" strokeLinecap="round"/></svg></div>
+        <div className="brand">관리자 로그인</div>
+        <div className="sub">JUNIPER ADMIN</div>
+      </div>
+      {err && <div className="error-box">{err}</div>}
+      <div className="input-group">
+        <label className="input-label">관리자 비밀번호</label>
+        <input className="input" type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} />
+      </div>
+      <button className="btn" onClick={submit}>로그인</button>
+      <div className="admin-link" onClick={onBack}>학생으로 돌아가기</div>
+    </div>
+  );
+}
+
+/* ============================================================
+   TAB BAR
+   ============================================================ */
+function TabBar({ tabs, active, onChange }){
+  return (
+    <div className="tabbar">
+      {tabs.map(t => (
+        <div key={t.key} className={"tab-item"+(active===t.key?' active':'')} onClick={()=>onChange(t.key)}>
+          {t.icon}
+          <span>{t.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============================================================
+   STUDENT: HOME TAB
+   ============================================================ */
+function HomeTab({ student, notices }){
+  const todayDow = new Date().getDay();
+  const schedule = student.schedule || [];
+  const latestNotice = notices[0];
+
+  return (
+    <div className="screen">
+      <div className="eyebrow">WELCOME</div>
+      <h1 className="page-title">{student.name}님, 안녕하세요 🥁</h1>
+      <p className="page-sub">{student.type === 'exam' ? '입시생' : '취미생'} 과정으로 등록되어 있어요.</p>
+
+      <div className="card">
+        <div className="card-title">📋 내 수업시간</div>
+        {schedule.length === 0 ? (
+          <div className="empty-state">
+            <div className="icon">🗓️</div>
+            <p>아직 등록된 수업시간이 없어요.<br/>원장님께 문의해주세요.</p>
+          </div>
+        ) : schedule.map((s,i)=>(
+          <div className="schedule-row" key={i}>
+            <div className={"schedule-day"+(DOW.indexOf(s.day)===todayDow?' today':'')}>{s.day}</div>
+            <div>
+              <div className="schedule-time">{s.start} – {s.end}</div>
+              <div className="notice-date" style={{marginTop:2, marginBottom:0}}>{s.day}요일 레슨</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {latestNotice && (
+        <div className="card">
+          <div className="card-title">📢 최근 공지</div>
+          <div className="notice-title">{latestNotice.important && '⭐ '}{latestNotice.title}</div>
+          <div className="notice-body" style={{ display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{latestNotice.content}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   STUDENT: RESERVE TAB
+   ============================================================ */
+function ReserveTab({ student }){
+  const [selDate, setSelDate] = useState(fmtDate(new Date()));
+  const [selRoom, setSelRoom] = useState(1);
+  const [dayReservations, setDayReservations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selStart, setSelStart] = useState(null);
+  const [selDur, setSelDur] = useState(60);
+  const [msg, setMsg] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const dateObj = useMemo(()=> new Date(selDate+'T00:00:00'), [selDate]);
+  const hours = useMemo(()=> getOperatingHours(dateObj), [dateObj]);
+  const slots = useMemo(()=> generateHalfHourSlots(hours), [hours]);
+
+  const dates = useMemo(()=>{
+    const arr = [];
+    let d = new Date(); d.setHours(0,0,0,0);
+    for(let i=0; i<14 && arr.length<12; i++){
+      const cand = addDays(d,i);
+      if(cand.getDay() !== 0) arr.push(cand);
+    }
+    return arr;
+  }, []);
+
+  useEffect(()=>{
+    setLoading(true);
+    const unsub = db.collection(COL_RESERVATIONS).where('date','==',selDate)
+      .onSnapshot(snap => {
+        setDayReservations(snap.docs.map(d=>({ id:d.id, ...d.data() })));
+        setLoading(false);
+      }, err => { console.error(err); setLoading(false); });
+    return () => unsub();
+  }, [selDate]);
+
+  useEffect(()=>{ setSelStart(null); setMsg(''); }, [selDate, selRoom]);
+
+  const myToday = dayReservations.filter(r => r.studentId === student.id);
+  const dailyLimit = student.type === 'exam' ? 180 : 60;
+  const usedMin = myToday.reduce((s,r)=> s + (toMin(r.end)-toMin(r.start)), 0);
+  const remainMin = Math.max(0, dailyLimit - usedMin);
+
+  const roomSlotMap = {}; // time -> 'free'|'mine'|'other'
+  slots.forEach(t=>{
+    const s = toMin(t), e = s+30;
+    const mine = dayReservations.some(r => Number(r.room)===selRoom && r.studentId===student.id && toMin(r.start)<e && s<toMin(r.end));
+    const other = dayReservations.some(r => Number(r.room)===selRoom && r.studentId!==student.id && toMin(r.start)<e && s<toMin(r.end));
+    roomSlotMap[t] = mine ? 'mine' : (other ? 'other' : 'free');
+  });
+
+  function canStartAt(startTime, dur){
+    const s = toMin(startTime), e = s + dur;
+    if(!hours || e > toMin(hours.end)) return false;
+    if(hasOverlap(dayReservations, selRoom, startTime, toTime(e))) return false;
+    const check = validateReservation(student.type, myToday, selRoom, startTime, toTime(e));
+    return check.ok;
+  }
+
+  async function submitReservation(){
+    if(selStart==null) return;
+    setSubmitting(true); setMsg('');
+    const end = toTime(toMin(selStart)+selDur);
+    try{
+      const fresh = await db.collection(COL_RESERVATIONS).where('date','==',selDate).get();
+      const freshList = fresh.docs.map(d=>({id:d.id, ...d.data()}));
+      const freshMine = freshList.filter(r=>r.studentId===student.id);
+      if(hasOverlap(freshList, selRoom, selStart, end)){ setMsg('방금 다른 학생이 예약해서 시간이 겹쳐요. 다른 시간을 선택해주세요.'); setSubmitting(false); return; }
+      const check = validateReservation(student.type, freshMine, selRoom, selStart, end);
+      if(!check.ok){ setMsg(check.msg); setSubmitting(false); return; }
+      await db.collection(COL_RESERVATIONS).add({
+        studentId: student.id, studentName: student.name, studentType: student.type,
+        room: selRoom, date: selDate, start: selStart, end,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setSelStart(null);
+      setMsg('✅ 예약이 완료됐어요!');
+    }catch(e){ setMsg('예약 중 오류가 발생했어요. 다시 시도해주세요.'); }
+    setSubmitting(false);
+  }
+
+  async function cancelReservation(id){
+    if(!window.confirm('예약을 취소할까요?')) return;
+    await db.collection(COL_RESERVATIONS).doc(id).delete();
+  }
+
+  const upcoming = dayReservations.filter(r=>r.studentId===student.id).sort((a,b)=> toMin(a.start)-toMin(b.start));
+
+  return (
+    <div className="screen">
+      <div className="eyebrow">PRACTICE ROOM</div>
+      <h1 className="page-title">연습실 예약</h1>
+      <p className="page-sub">{student.type==='exam' ? '입시생: 1일 최대 3시간 (2시간 연속 + 30분 휴식 또는 방 이동 후 1시간)' : '취미생: 1일 최대 1시간'}</p>
+
+      <div className="date-scroll">
+        {dates.map(d=>{
+          const ds = fmtDate(d);
+          const isToday = ds === fmtDate(new Date());
+          return (
+            <div key={ds} className={"date-chip"+(ds===selDate?' active':'')+(isToday?' today':'')} onClick={()=>setSelDate(ds)}>
+              <div className="dow">{DOW[d.getDay()]}</div>
+              <div className="num">{d.getDate()}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="budget-bar-wrap">
+        <div style={{display:'flex',justifyContent:'space-between',fontSize:'12px',color:'var(--text-muted)'}}>
+          <span>오늘 남은 예약 가능 시간</span>
+          <span style={{fontFamily:'var(--font-mono)',color:'var(--brass-bright)',fontWeight:700}}>{Math.floor(remainMin/60)}시간 {remainMin%60}분</span>
+        </div>
+        <div className="budget-bar-track"><div className="budget-bar-fill" style={{width: (100*(dailyLimit-remainMin)/dailyLimit)+'%'}}/></div>
+      </div>
+
+      {!hours ? (
+        <div className="info-box">일요일은 학원 휴무일이에요. 다른 날짜를 선택해주세요.</div>
+      ) : (
+        <React.Fragment>
+          <div className="room-tabs">
+            {ROOMS.map(r=>(
+              <div key={r} className={"room-tab"+(selRoom===r?' active':'')} onClick={()=>setSelRoom(r)}>
+                <div className="rn">ROOM</div>
+                <div className="rt">{r}번</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="card">
+            <div className="card-title">{selRoom}번방 현황 · {fmtKDate(dateObj)}</div>
+            {loading ? <div className="loading-spin"/> : (
+              <React.Fragment>
+                <div className="slot-grid">
+                  {slots.map(t=>(
+                    <div key={t} className={"slot-cell "+roomSlotMap[t]}
+                      onClick={()=>{ if(roomSlotMap[t]!=='other') setSelStart(t===selStart?null:t); }}
+                      style={selStart===t ? {outline:'2px solid var(--brass-bright)'} : {}}>
+                      {t}
+                    </div>
+                  ))}
+                </div>
+                <div className="legend">
+                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--surface-2)',border:'1px solid rgba(201,162,39,0.3)'}}/>예약 가능</div>
+                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--brass-soft)',border:'1px solid var(--brass)'}}/>내 예약</div>
+                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--rec-soft)',border:'1px solid var(--rec)'}}/>예약됨</div>
+                </div>
+              </React.Fragment>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="card-title">시작 시간 · {selRoom}번방</div>
+            <select className="input" value={selStart||''} onChange={e=>setSelStart(e.target.value||null)}>
+              <option value="">시작 시간을 선택하세요</option>
+              {slots.filter(t=>roomSlotMap[t]!=='other').map(t=>(
+                <option key={t} value={t} disabled={!canStartAt(t,60) && !canStartAt(t,120)}>{t}</option>
+              ))}
+            </select>
+
+            <div className="input-label" style={{marginTop:16}}>이용 시간</div>
+            <div className="dur-row">
+              <div className={"dur-opt"+(selDur===60?' active':'')+(selStart&&!canStartAt(selStart,60)?' disabled':'')} onClick={()=>setSelDur(60)}>1시간</div>
+              {student.type==='exam' && (
+                <div className={"dur-opt"+(selDur===120?' active':'')+(selStart&&!canStartAt(selStart,120)?' disabled':'')} onClick={()=>setSelDur(120)}>2시간</div>
+              )}
+            </div>
+
+            {msg && <div className={msg.startsWith('✅')?'info-box':'error-box'} style={{marginTop:16}}>{msg}</div>}
+
+            <button className="btn" style={{marginTop:16}} disabled={!selStart || submitting || !canStartAt(selStart,selDur)} onClick={submitReservation}>
+              {submitting ? '예약 중...' : (selStart ? `${selStart} – ${toTime(toMin(selStart)+selDur)} 예약하기` : '시간을 선택해주세요')}
+            </button>
+          </div>
+        </React.Fragment>
+      )}
+
+      <div className="card">
+        <div className="card-title">📅 {fmtKDate(dateObj)} 내 예약</div>
+        {upcoming.length===0 ? (
+          <div className="empty-state"><p>이 날 예약이 없어요.</p></div>
+        ) : upcoming.map(r=>(
+          <div className="res-row" key={r.id}>
+            <div style={{display:'flex',alignItems:'center'}}>
+              <div className="room-badge">{r.room}번방</div>
+              <div>
+                <div className="res-time">{r.start} – {r.end}</div>
+              </div>
+            </div>
+            <div className="cancel-x" onClick={()=>cancelReservation(r.id)}>✕</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   STUDENT: NOTICE TAB
+   ============================================================ */
+function NoticeTab({ notices }){
+  return (
+    <div className="screen">
+      <div className="eyebrow">ANNOUNCEMENTS</div>
+      <h1 className="page-title">학원 안내사항</h1>
+      <p className="page-sub">주니퍼 실용음악학원의 최신 소식을 확인하세요.</p>
+      {notices.length===0 ? (
+        <div className="empty-state"><div className="icon">📭</div><p>아직 등록된 공지사항이 없어요.</p></div>
+      ) : notices.map(n=>(
+        <div className={"notice-item"+(n.important?' important':'')} key={n.id}>
+          <div className="notice-title">{n.important && '⭐ '}{n.title}</div>
+          <div className="notice-date">{n.createdAt && n.createdAt.toDate ? n.createdAt.toDate().toLocaleDateString('ko-KR') : ''}</div>
+          <div className="notice-body">{n.content}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============================================================
+   STUDENT: MY TAB
+   ============================================================ */
+function MyTab({ student, onLogout }){
+  return (
+    <div className="screen">
+      <div className="eyebrow">MY PAGE</div>
+      <h1 className="page-title">내 정보</h1>
+      <div className="card">
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+          <div>
+            <div style={{fontFamily:'var(--font-display)',fontWeight:700,fontSize:18}}>{student.name}</div>
+            <div style={{fontSize:12,color:'var(--text-faint)',marginTop:3}}>주니퍼 실용음악학원 드럼반</div>
+          </div>
+          <span className={"tag "+(student.type==='exam'?'tag-exam':'tag-hobby')}>{student.type==='exam'?'입시생':'취미생'}</span>
+        </div>
+      </div>
+      <div className="card">
+        <div className="card-title">이용 안내</div>
+        <p style={{fontSize:12.5,color:'var(--text-muted)',lineHeight:1.7,margin:0}}>
+          예약 및 수업시간 관련 문의는 원장님께 직접 연락해주세요.<br/>
+          수강 유형(취미생/입시생) 변경은 관리자만 가능합니다.
+        </p>
+      </div>
+      <button className="btn btn-ghost" onClick={onLogout}>로그아웃</button>
+    </div>
+  );
+}
+
+/* ============================================================
+   STUDENT SHELL
+   ============================================================ */
+function StudentShell({ student, onLogout }){
+  const [tab, setTab] = useState('home');
+  const [notices, setNotices] = useState([]);
+  const [liveStudent, setLiveStudent] = useState(student);
+
+  useEffect(()=>{
+    const unsub = db.collection(COL_NOTICES).orderBy('createdAt','desc').onSnapshot(snap=>{
+      setNotices(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return ()=>unsub();
+  }, []);
+
+  useEffect(()=>{
+    const unsub = db.collection(COL_STUDENTS).doc(student.id).onSnapshot(doc=>{
+      if(doc.exists) setLiveStudent({ id:doc.id, ...doc.data() });
+    });
+    return ()=>unsub();
+  }, [student.id]);
+
+  const tabs = [
+    { key:'home', label:'홈', icon:<Icon.home/> },
+    { key:'reserve', label:'예약', icon:<Icon.cal/> },
+    { key:'notice', label:'공지', icon:<Icon.bell/> },
+    { key:'my', label:'마이', icon:<Icon.user/> },
+  ];
+
+  return (
+    <React.Fragment>
+      <AppHeader right={<span>{liveStudent.type==='exam'?'입시생':'취미생'}</span>} />
+      {tab==='home' && <HomeTab student={liveStudent} notices={notices} />}
+      {tab==='reserve' && <ReserveTab student={liveStudent} />}
+      {tab==='notice' && <NoticeTab notices={notices} />}
+      {tab==='my' && <MyTab student={liveStudent} onLogout={onLogout} />}
+      <TabBar tabs={tabs} active={tab} onChange={setTab} />
+    </React.Fragment>
+  );
+}
+
+/* ============================================================
+   ADMIN: STUDENTS TAB
+   ============================================================ */
+function AdminStudentsTab(){
+  const [students, setStudents] = useState([]);
+  const [q, setQ] = useState('');
+  const [editing, setEditing] = useState(null); // student obj or null
+
+  useEffect(()=>{
+    const unsub = db.collection(COL_STUDENTS).orderBy('name').onSnapshot(snap=>{
+      setStudents(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return ()=>unsub();
+  }, []);
+
+  const filtered = students.filter(s => s.name.includes(q.trim()));
+
+  return (
+    <div className="screen">
+      <div className="eyebrow">ADMIN</div>
+      <h1 className="page-title">학생 관리</h1>
+      <p className="page-sub">총 {students.length}명 등록됨</p>
+      <div className="search-input-wrap">
+        <input className="input" placeholder="이름으로 검색" value={q} onChange={e=>setQ(e.target.value)} />
+      </div>
+      {filtered.length===0 ? (
+        <div className="empty-state"><p>등록된 학생이 없어요.</p></div>
+      ) : filtered.map(s=>(
+        <div className="list-item-row" key={s.id} onClick={()=>setEditing(s)}>
+          <div>
+            <div className="name">{s.name}</div>
+            <div className="meta">{(s.schedule||[]).length}개 수업 · {s.phoneLast4}</div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <span className={"tag "+(s.type==='exam'?'tag-exam':'tag-hobby')}>{s.type==='exam'?'입시생':'취미생'}</span>
+            <span className="chev">›</span>
+          </div>
+        </div>
+      ))}
+      {editing && <StudentEditModal student={editing} onClose={()=>setEditing(null)} />}
+    </div>
+  );
+}
+
+function StudentEditModal({ student, onClose }){
+  const [type, setType] = useState(student.type);
+  const [schedule, setSchedule] = useState(student.schedule || []);
+  const [newDay, setNewDay] = useState('월');
+  const [newStart, setNewStart] = useState('16:00');
+  const [newEnd, setNewEnd] = useState('17:00');
+  const [saving, setSaving] = useState(false);
+
+  function addSchedule(){
+    setSchedule([...schedule, { day:newDay, start:newStart, end:newEnd }]);
+  }
+  function removeSchedule(i){
+    setSchedule(schedule.filter((_,idx)=>idx!==i));
+  }
+  async function save(){
+    setSaving(true);
+    await db.collection(COL_STUDENTS).doc(student.id).update({ type, schedule });
+    setSaving(false);
+    onClose();
+  }
+  async function del(){
+    if(!window.confirm(student.name+' 학생을 삭제할까요? 예약 내역은 삭제되지 않아요.')) return;
+    await db.collection(COL_STUDENTS).doc(student.id).delete();
+    onClose();
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div className="modal-close-row">
+          <div className="modal-title">{student.name}</div>
+          <div className="icon-btn" onClick={onClose}>✕</div>
+        </div>
+
+        <div className="input-label">수강 유형</div>
+        <div className="toggle-row" style={{marginBottom:18}}>
+          <div className={"toggle-opt"+(type==='hobby'?' active':'')} onClick={()=>setType('hobby')}>취미생</div>
+          <div className={"toggle-opt"+(type==='exam'?' active':'')} onClick={()=>setType('exam')}>입시생</div>
+        </div>
+
+        <div className="input-label">수업시간표</div>
+        {schedule.map((s,i)=>(
+          <div className="mini-add-row" key={i}>
+            <div className="input" style={{flex:'0 0 44px',textAlign:'center'}}>{s.day}</div>
+            <div className="input" style={{flex:1,textAlign:'center'}}>{s.start} – {s.end}</div>
+            <div className="remove-chip" onClick={()=>removeSchedule(i)}>✕</div>
+          </div>
+        ))}
+
+        <div className="mini-add-row" style={{marginTop:10}}>
+          <select className="input" style={{flex:'0 0 66px'}} value={newDay} onChange={e=>setNewDay(e.target.value)}>
+            {['월','화','수','목','금','토','일'].map(d=><option key={d} value={d}>{d}</option>)}
+          </select>
+          <input className="input" type="time" value={newStart} onChange={e=>setNewStart(e.target.value)} />
+          <input className="input" type="time" value={newEnd} onChange={e=>setNewEnd(e.target.value)} />
+        </div>
+        <button className="btn btn-ghost btn-sm" style={{width:'100%',marginBottom:20}} onClick={addSchedule}>+ 수업시간 추가</button>
+
+        <button className="btn" disabled={saving} onClick={save} style={{marginBottom:10}}>{saving?'저장 중...':'저장하기'}</button>
+        <button className="btn btn-danger" onClick={del}>학생 삭제</button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   ADMIN: RESERVATIONS TAB
+   ============================================================ */
+function AdminReservationsTab(){
+  const [selDate, setSelDate] = useState(fmtDate(new Date()));
+  const [reservations, setReservations] = useState([]);
+
+  useEffect(()=>{
+    const unsub = db.collection(COL_RESERVATIONS).where('date','==',selDate).onSnapshot(snap=>{
+      setReservations(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=> a.room-b.room || toMin(a.start)-toMin(b.start)));
+    });
+    return ()=>unsub();
+  }, [selDate]);
+
+  async function cancel(id){
+    if(!window.confirm('이 예약을 취소할까요?')) return;
+    await db.collection(COL_RESERVATIONS).doc(id).delete();
+  }
+
+  const dates = useMemo(()=>{
+    const arr = []; let d = new Date(); d.setHours(0,0,0,0);
+    for(let i=0;i<14;i++) arr.push(addDays(d,i));
+    return arr;
+  }, []);
+
+  return (
+    <div className="screen">
+      <div className="eyebrow">ADMIN</div>
+      <h1 className="page-title">예약 현황</h1>
+      <div className="date-scroll">
+        {dates.map(d=>{
+          const ds = fmtDate(d);
+          return (
+            <div key={ds} className={"date-chip"+(ds===selDate?' active':'')} onClick={()=>setSelDate(ds)}>
+              <div className="dow">{DOW[d.getDay()]}</div>
+              <div className="num">{d.getDate()}</div>
+            </div>
+          );
+        })}
+      </div>
+      {reservations.length===0 ? (
+        <div className="empty-state"><div className="icon">🗓️</div><p>이 날 예약이 없어요.</p></div>
+      ) : ROOMS.map(room=>{
+        const rs = reservations.filter(r=>Number(r.room)===room);
+        if(rs.length===0) return null;
+        return (
+          <div className="card" key={room}>
+            <div className="card-title">{room}번방</div>
+            {rs.map(r=>(
+              <div className="res-row" key={r.id}>
+                <div>
+                  <div className="res-time">{r.start} – {r.end}</div>
+                  <div className="res-sub">{r.studentName} · {r.studentType==='exam'?'입시생':'취미생'}</div>
+                </div>
+                <div className="cancel-x" onClick={()=>cancel(r.id)}>✕</div>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ============================================================
+   ADMIN: NOTICES TAB
+   ============================================================ */
+function AdminNoticesTab(){
+  const [notices, setNotices] = useState([]);
+  const [editing, setEditing] = useState(null); // notice obj | 'new' | null
+
+  useEffect(()=>{
+    const unsub = db.collection(COL_NOTICES).orderBy('createdAt','desc').onSnapshot(snap=>{
+      setNotices(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return ()=>unsub();
+  }, []);
+
+  return (
+    <div className="screen">
+      <div className="eyebrow">ADMIN</div>
+      <h1 className="page-title">공지사항 관리</h1>
+      <button className="btn" style={{marginBottom:18}} onClick={()=>setEditing('new')}>+ 새 공지 작성</button>
+      {notices.length===0 ? (
+        <div className="empty-state"><p>등록된 공지사항이 없어요.</p></div>
+      ) : notices.map(n=>(
+        <div className={"notice-item"+(n.important?' important':'')} key={n.id} onClick={()=>setEditing(n)} style={{cursor:'pointer'}}>
+          <div className="notice-title">{n.important && '⭐ '}{n.title}</div>
+          <div className="notice-body" style={{ display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{n.content}</div>
+        </div>
+      ))}
+      {editing && <NoticeEditModal notice={editing==='new'?null:editing} onClose={()=>setEditing(null)} />}
+    </div>
+  );
+}
+
+function NoticeEditModal({ notice, onClose }){
+  const [title, setTitle] = useState(notice?.title || '');
+  const [content, setContent] = useState(notice?.content || '');
+  const [important, setImportant] = useState(notice?.important || false);
+  const [saving, setSaving] = useState(false);
+
+  async function save(){
+    if(!title.trim() || !content.trim()) return;
+    setSaving(true);
+    if(notice){
+      await db.collection(COL_NOTICES).doc(notice.id).update({ title, content, important });
+    } else {
+      await db.collection(COL_NOTICES).add({ title, content, important, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    }
+    setSaving(false);
+    onClose();
+  }
+  async function del(){
+    if(!window.confirm('이 공지를 삭제할까요?')) return;
+    await db.collection(COL_NOTICES).doc(notice.id).delete();
+    onClose();
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div className="modal-close-row">
+          <div className="modal-title">{notice ? '공지 수정' : '새 공지 작성'}</div>
+          <div className="icon-btn" onClick={onClose}>✕</div>
+        </div>
+        <div className="input-group">
+          <label className="input-label">제목</label>
+          <input className="input" value={title} onChange={e=>setTitle(e.target.value)} />
+        </div>
+        <div className="input-group">
+          <label className="input-label">내용</label>
+          <textarea className="input" rows="6" value={content} onChange={e=>setContent(e.target.value)} style={{resize:'vertical'}}/>
+        </div>
+        <div className="checkbox-row" onClick={()=>setImportant(!important)}>
+          <div className={"checkbox-box"+(important?' checked':'')}>{important && '✓'}</div>
+          <span style={{fontSize:13.5}}>중요 공지로 상단 고정</span>
+        </div>
+        <button className="btn" disabled={saving} onClick={save} style={{marginTop:14,marginBottom:notice?10:0}}>{saving?'저장 중...':'저장하기'}</button>
+        {notice && <button className="btn btn-danger" onClick={del}>삭제하기</button>}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   ADMIN SHELL
+   ============================================================ */
+function AdminShell({ onLogout }){
+  const [tab, setTab] = useState('students');
+  const tabs = [
+    { key:'students', label:'학생', icon:<Icon.user/> },
+    { key:'reservations', label:'예약', icon:<Icon.cal/> },
+    { key:'notices', label:'공지', icon:<Icon.bell/> },
+  ];
+  return (
+    <React.Fragment>
+      <AppHeader subtitle="ADMIN MODE" right={<span onClick={onLogout} style={{cursor:'pointer',textDecoration:'underline'}}>로그아웃</span>} />
+      {tab==='students' && <AdminStudentsTab/>}
+      {tab==='reservations' && <AdminReservationsTab/>}
+      {tab==='notices' && <AdminNoticesTab/>}
+      <TabBar tabs={tabs} active={tab} onChange={setTab} />
+    </React.Fragment>
+  );
+}
+
+/* ============================================================
+   ROOT APP
+   ============================================================ */
+function App(){
+  const [session, setSession] = useState(undefined); // undefined = loading, null = logged out
+  const [view, setView] = useState('login'); // login | adminLogin
+
+  useEffect(()=>{
+    async function restore(){
+      try{
+        const raw = localStorage.getItem('juniper_session');
+        if(!raw){ setSession(null); return; }
+        const parsed = JSON.parse(raw);
+        if(parsed.type === 'admin'){ setSession({ type:'admin' }); return; }
+        if(parsed.type === 'student' && parsed.studentId){
+          const doc = await db.collection(COL_STUDENTS).doc(parsed.studentId).get();
+          if(doc.exists){ setSession({ type:'student', student:{ id:doc.id, ...doc.data() } }); return; }
+        }
+        localStorage.removeItem('juniper_session');
+        setSession(null);
+      }catch(e){ setSession(null); }
+    }
+    restore();
+  }, []);
+
+  function logout(){
+    localStorage.removeItem('juniper_session');
+    setSession(null);
+    setView('login');
+  }
+
+  if(FIREBASE_NOT_CONFIGURED){
+    return (
+      <div className="auth-wrap">
+        <div className="auth-logo">
+          <div className="logo-mark"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#C9A227" strokeWidth="1.4"/></svg></div>
+          <div className="brand">설정이 필요해요</div>
+          <div className="sub">SETUP REQUIRED</div>
+        </div>
+        <div className="error-box">
+          아직 Firebase 프로젝트 설정 전이에요. 코드 상단의 <code>firebaseConfig</code> 값을 본인 Firebase 프로젝트의 실제 값으로 바꿔주셔야 회원가입/로그인이 동작해요. (지금 상태로는 "처리 중"에서 멈춰요)
+        </div>
+        <p style={{fontSize:12.5,color:'var(--text-muted)',lineHeight:1.7}}>
+          Firebase 콘솔 → 프로젝트 설정 → 일반 → 내 앱 → SDK 설정에서 config 값을 복사해 붙여넣고, Firestore 규칙도 파일 상단 주석대로 설정한 뒤 다시 열어주세요.
+        </p>
+      </div>
+    );
+  }
+
+  if(session === undefined){
+    return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}><div className="loading-spin"/></div>;
+  }
+  if(session === null){
+    if(view === 'adminLogin'){
+      return <AdminLoginScreen onAdminLogin={()=>setSession({type:'admin'})} onBack={()=>setView('login')} />;
+    }
+    return <AuthScreen onStudentLogin={(student)=>setSession({type:'student', student})} onGoAdmin={()=>setView('adminLogin')} />;
+  }
+  if(session.type === 'admin'){
+    return <AdminShell onLogout={logout} />;
+  }
+  return <StudentShell student={session.student} onLogout={logout} />;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
