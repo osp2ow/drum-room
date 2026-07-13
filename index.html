@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="theme-color" content="#14151A" />
+<meta name="theme-color" content="#2FBFAF" />
 <title>주니퍼 실용음악학원 · DRUM</title>
 
 <!-- ============================================================
@@ -35,28 +35,27 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 
 <style>
   :root{
-    --ink:#14151A;
-    --surface:#1C1E26;
-    --surface-2:#242631;
-    --surface-3:#2C2F3C;
-    --border:#34363F;
-    --brass:#C9A227;
-    --brass-bright:#E4C04A;
-    --brass-soft:rgba(201,162,39,0.14);
-    --amber:#E8935A;
-    --rec:#E1483C;
-    --rec-soft:rgba(225,72,60,0.16);
-    --text:#F1EEE6;
-    --text-muted:#9A9CA6;
-    --text-faint:#5C5E68;
-    --font-display:'Space Grotesk',sans-serif;
-    --font-body:'Inter',sans-serif;
-    --font-mono:'Space Mono',monospace;
+    --ink:#F0F9F8;
+    --surface:#FFFFFF;
+    --surface-2:#F1F6F5;
+    --surface-3:#E6EFEE;
+    --border:#DCE7E6;
+    --brass:#2FBFAF;
+    --brass-bright:#17968A;
+    --brass-soft:rgba(47,191,175,0.12);
+    --amber:#FF8A65;
+    --rec:#FF5A5F;
+    --rec-soft:rgba(255,90,95,0.12);
+    --text:#1E2B2A;
+    --text-muted:#5C6E6C;
+    --text-faint:#94A3A2;
+    --font-display:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;
+    --font-body:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;
+    --font-mono:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;
     --safe-b: env(safe-area-inset-bottom, 0px);
     --safe-t: env(safe-area-inset-top, 0px);
   }
@@ -72,7 +71,8 @@
     margin:0 auto;
     min-height:100vh;
     background:
-      radial-gradient(1200px 600px at 50% -10%, rgba(201,162,39,0.08), transparent 60%),
+      radial-gradient(1200px 600px at 50% -10%, rgba(47,191,175,0.10), transparent 60%),
+
       var(--ink);
     display:flex;
     flex-direction:column;
@@ -85,48 +85,49 @@
   * { scrollbar-width:none; }
 
   .app-header{
-    padding:calc(18px + var(--safe-t)) 20px 16px;
+    padding:calc(20px + var(--safe-t)) 20px 20px;
     display:flex;align-items:center;gap:12px;
-    border-bottom:1px solid var(--border);
-    position:sticky;top:0;background:rgba(20,21,26,0.92);backdrop-filter:blur(10px);
-    z-index:20;
+    position:sticky;top:0;background:linear-gradient(135deg, var(--brass), var(--brass-bright));
+    z-index:20;box-shadow:0 4px 16px rgba(23,150,138,0.18);
   }
   .logo-mark{
     width:38px;height:38px;border-radius:11px;
-    background:linear-gradient(155deg, var(--surface-3), var(--surface));
-    border:1px solid var(--border);
+    background:rgba(255,255,255,0.22);
+    border:1px solid rgba(255,255,255,0.3);
     display:flex;align-items:center;justify-content:center;flex-shrink:0;
   }
-  .header-text .brand{font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:0.02em;}
-  .header-text .sub{font-family:var(--font-mono);font-size:10.5px;color:var(--brass);letter-spacing:0.18em;margin-top:1px;}
-  .header-right{margin-left:auto;font-size:12px;color:var(--text-muted);text-align:right;}
+  .header-text .brand{font-family:var(--font-display);font-weight:700;font-size:16px;letter-spacing:0.01em;color:#FFFFFF;}
+  .header-text .sub{font-family:var(--font-mono);font-size:10.5px;color:rgba(255,255,255,0.85);letter-spacing:0.14em;margin-top:1px;}
+  .header-right{margin-left:auto;font-size:12.5px;color:rgba(255,255,255,0.9);text-align:right;font-weight:600;}
 
   .screen{flex:1;padding:20px 20px calc(96px + var(--safe-b));animation:fadeIn .25s ease;}
   @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 
-  .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.14em;color:var(--brass);text-transform:uppercase;margin-bottom:6px;}
+  .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.14em;color:var(--brass-bright);text-transform:uppercase;margin-bottom:6px;font-weight:700;}
   h1.page-title{font-family:var(--font-display);font-size:23px;font-weight:700;margin:0 0 4px;letter-spacing:-0.01em;}
-  .page-sub{font-size:13px;color:var(--text-muted);margin:0 0 22px;line-height:1.5;}
+  .page-sub{font-size:13.5px;color:var(--text-muted);margin:0 0 22px;line-height:1.55;}
 
   .card{
     background:var(--surface);
     border:1px solid var(--border);
-    border-radius:16px;
+    border-radius:18px;
     padding:18px;
     margin-bottom:14px;
+    box-shadow:0 2px 10px rgba(30,60,58,0.05);
   }
-  .card-title{font-family:var(--font-display);font-size:15px;font-weight:600;margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .card-title{font-family:var(--font-display);font-size:15.5px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px;color:var(--text);}
 
   .btn{
     display:flex;align-items:center;justify-content:center;gap:8px;
-    background:var(--brass);color:#1A1608;
-    font-family:var(--font-display);font-weight:700;font-size:14.5px;
-    border:none;border-radius:12px;padding:14px 18px;
+    background:var(--brass);color:#FFFFFF;
+    font-family:var(--font-display);font-weight:700;font-size:15px;
+    border:none;border-radius:14px;padding:15px 18px;
     cursor:pointer;width:100%;
     transition:transform .12s ease, filter .12s ease;
+    box-shadow:0 3px 10px rgba(47,191,175,0.28);
   }
-  .btn:active{transform:scale(0.98);filter:brightness(0.94);}
-  .btn:disabled{background:var(--surface-3);color:var(--text-faint);cursor:not-allowed;}
+  .btn:active{transform:scale(0.98);filter:brightness(0.96);}
+  .btn:disabled{background:var(--surface-3);color:var(--text-faint);cursor:not-allowed;box-shadow:none;}
   .btn-ghost{
     background:transparent;border:1px solid var(--border);color:var(--text);
   }
@@ -153,11 +154,11 @@
     display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
     padding:4px 9px;border-radius:100px;font-family:var(--font-mono);letter-spacing:0.02em;
   }
-  .tag-exam{background:var(--rec-soft);color:#F0796E;}
+  .tag-exam{background:var(--rec-soft);color:#D93A3F;}
   .tag-hobby{background:var(--brass-soft);color:var(--brass-bright);}
 
-  .error-box{background:var(--rec-soft);border:1px solid rgba(225,72,60,0.35);color:#F0968D;font-size:12.5px;padding:11px 13px;border-radius:10px;margin-bottom:14px;line-height:1.5;}
-  .info-box{background:var(--brass-soft);border:1px solid rgba(201,162,39,0.3);color:var(--brass-bright);font-size:12.5px;padding:11px 13px;border-radius:10px;margin-bottom:14px;line-height:1.5;}
+  .error-box{background:var(--rec-soft);border:1px solid rgba(255,90,95,0.3);color:#C7383C;font-size:13px;padding:12px 14px;border-radius:12px;margin-bottom:14px;line-height:1.55;font-weight:600;}
+  .info-box{background:var(--brass-soft);border:1px solid rgba(47,191,175,0.3);color:var(--brass-bright);font-size:13px;padding:12px 14px;border-radius:12px;margin-bottom:14px;line-height:1.55;font-weight:600;}
 
   .empty-state{text-align:center;padding:40px 16px;color:var(--text-faint);}
   .empty-state .icon{font-size:26px;margin-bottom:8px;opacity:0.5;}
@@ -178,7 +179,7 @@
   .tabbar{
     position:fixed;bottom:0;left:50%;transform:translateX(-50%);
     width:100%;max-width:480px;
-    display:flex;background:rgba(28,30,38,0.94);backdrop-filter:blur(14px);
+    display:flex;background:rgba(255,255,255,0.94);backdrop-filter:blur(14px);
     border-top:1px solid var(--border);
     padding:9px 6px calc(9px + var(--safe-b));
     z-index:30;
@@ -191,6 +192,15 @@
   .tab-item svg{width:21px;height:21px;}
   .tab-item span{font-size:10.5px;font-weight:600;font-family:var(--font-mono);letter-spacing:0.02em;}
 
+  .hero-card{
+    background:linear-gradient(135deg, var(--brass), var(--brass-bright));
+    border-radius:22px;padding:26px 22px;margin-bottom:16px;color:#FFFFFF;
+    box-shadow:0 10px 22px rgba(47,191,175,0.28);
+  }
+  .hero-eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;color:rgba(255,255,255,0.85);text-transform:uppercase;margin-bottom:8px;font-weight:700;}
+  .hero-name{font-family:var(--font-display);font-size:22px;font-weight:800;margin-bottom:8px;letter-spacing:-0.01em;}
+  .hero-sub{font-size:13.5px;color:rgba(255,255,255,0.92);line-height:1.55;}
+
   .date-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;}
   .date-chip{
     flex-shrink:0;width:52px;padding:10px 0;border-radius:13px;text-align:center;
@@ -200,9 +210,9 @@
   .date-chip .dow{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);}
   .date-chip.active .dow{color:#3a2f06;}
   .date-chip .num{font-family:var(--font-display);font-size:16px;font-weight:700;margin-top:2px;}
-  .date-chip.active .num{color:#1A1608;}
+  .date-chip.active .num{color:#FFFFFF;}
   .date-chip.today .num::after{content:'';display:block;width:4px;height:4px;border-radius:50%;background:var(--rec);margin:3px auto 0;}
-  .date-chip.active.today .num::after{background:#1A1608;}
+  .date-chip.active.today .num::after{background:#FFFFFF;}
 
   .room-tabs{display:flex;gap:7px;margin-bottom:16px;}
   .room-tab{
@@ -214,22 +224,24 @@
   .room-tab.active .rn{color:var(--brass);}
   .room-tab .rt{font-family:var(--font-display);font-weight:700;font-size:14px;margin-top:1px;}
 
-  .slot-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:6px;}
+  .slot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px;}
   .slot-cell{
-    aspect-ratio:1;border-radius:7px;border:1px solid var(--border);
+    aspect-ratio:1.3;border-radius:13px;border:1.5px solid var(--border);
     background:var(--surface-2);display:flex;align-items:center;justify-content:center;
-    font-family:var(--font-mono);font-size:8.5px;color:var(--text-faint);position:relative;
+    font-family:var(--font-mono);font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;
+    color:var(--text);position:relative;letter-spacing:0.01em;
   }
-  .slot-cell.free{border-color:rgba(201,162,39,0.3);cursor:pointer;}
+  .slot-cell.free{border-color:rgba(47,191,175,0.35);cursor:pointer;}
   .slot-cell.mine{background:var(--brass-soft);border-color:var(--brass);color:var(--brass-bright);}
-  .slot-cell.other{background:var(--rec-soft);border-color:rgba(225,72,60,0.35);color:#F0968D;}
-  .slot-cell.selected{background:var(--brass);border-color:var(--brass);color:#1A1608;font-weight:700;cursor:pointer;}
-  .slot-cell.blocked{opacity:0.3;}
-  .slot-cell.blocked::after{content:'🚫';position:absolute;font-size:9px;opacity:0.8;}
+  .slot-cell.other{background:var(--rec-soft);border-color:rgba(255,90,95,0.3);color:#C7383C;}
+  .slot-cell.selected{background:var(--brass);border-color:var(--brass);color:#FFFFFF;font-weight:800;cursor:pointer;box-shadow:0 3px 8px rgba(47,191,175,0.35);}
+  .slot-cell.blocked{opacity:0.35;}
+  .slot-cell.blocked::after{content:'🚫';position:absolute;font-size:15px;opacity:0.85;}
   .slot-cell .dot{width:4px;height:4px;border-radius:50%;background:var(--rec);position:absolute;top:4px;right:4px;}
   .legend{display:flex;gap:14px;margin-bottom:20px;flex-wrap:wrap;}
-  .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);}
-  .legend-dot{width:9px;height:9px;border-radius:3px;}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);font-weight:500;}
+  .legend-dot{width:10px;height:10px;border-radius:3px;}
+
 
   .budget-bar-wrap{margin-bottom:18px;}
   .budget-bar-track{height:8px;background:var(--surface-2);border-radius:100px;overflow:hidden;margin-top:8px;}
@@ -257,7 +269,7 @@
   .res-row .cancel-x{color:var(--text-faint);font-size:18px;cursor:pointer;padding:4px 8px;}
 
   .notice-item{padding:16px;border-radius:14px;background:var(--surface);border:1px solid var(--border);margin-bottom:12px;}
-  .notice-item.important{border-color:rgba(201,162,39,0.45);background:linear-gradient(160deg, var(--brass-soft), var(--surface) 60%);}
+  .notice-item.important{border-color:rgba(47,191,175,0.4);background:linear-gradient(160deg, var(--brass-soft), var(--surface) 60%);}
   .notice-title{font-family:var(--font-display);font-weight:700;font-size:14.5px;margin-bottom:6px;display:flex;align-items:center;gap:7px;}
   .notice-date{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);margin-bottom:8px;}
   .notice-body{font-size:13px;color:var(--text-muted);line-height:1.65;white-space:pre-wrap;}
@@ -269,8 +281,33 @@
     display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:13px;
     margin-right:12px;flex-shrink:0;color:var(--text-muted);
   }
-  .schedule-day.today{background:var(--brass);color:#1A1608;}
+  .schedule-day.today{background:var(--brass);color:#FFFFFF;}
   .schedule-time{font-family:var(--font-mono);font-size:14.5px;font-weight:700;}
+
+  .date-scroll-row{display:flex;gap:10px;align-items:flex-start;margin-bottom:2px;}
+  .date-scroll-row .date-scroll{flex:1;margin-bottom:0;}
+  .cal-toggle-btn{
+    flex-shrink:0;width:52px;height:52px;border-radius:13px;background:var(--surface);
+    border:1px solid var(--border);display:flex;align-items:center;justify-content:center;
+    color:var(--brass-bright);cursor:pointer;
+  }
+  .cal-toggle-btn svg{width:22px;height:22px;}
+
+  .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .cal-nav-btn{width:36px;height:36px;border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--text);cursor:pointer;}
+  .cal-month-label{font-family:var(--font-display);font-weight:700;font-size:16px;}
+  .cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:8px;}
+  .cal-dow{text-align:center;font-size:12px;color:var(--text-faint);font-weight:600;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .cal-cell{
+    aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:11px;
+    font-size:14.5px;font-weight:600;color:var(--text-faint);
+  }
+  .cal-cell.empty{visibility:hidden;}
+  .cal-cell.avail{color:var(--text);background:var(--surface-2);cursor:pointer;}
+  .cal-cell.avail:hover{background:var(--brass-soft);}
+  .cal-cell.selected{background:var(--brass);color:#FFFFFF;font-weight:800;}
+  .cal-cell.disabled{opacity:0.3;}
 
   .modal-overlay{
     position:fixed;inset:0;background:rgba(10,10,13,0.7);backdrop-filter:blur(3px);
@@ -303,7 +340,7 @@
   .day-pill-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
   .day-pill{width:34px;height:34px;border-radius:9px;background:var(--surface-2);border:1px solid var(--border);
     display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer;}
-  .day-pill.active{background:var(--brass);color:#1A1608;border-color:var(--brass);}
+  .day-pill.active{background:var(--brass);color:#FFFFFF;border-color:var(--brass);}
 
   .loading-spin{
     width:22px;height:22px;border-radius:50%;border:2.5px solid var(--surface-3);border-top-color:var(--brass);
@@ -313,7 +350,7 @@
 
   .checkbox-row{display:flex;align-items:center;gap:9px;padding:12px 0;cursor:pointer;}
   .checkbox-box{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;}
-  .checkbox-box.checked{background:var(--brass);border-color:var(--brass);}
+  .checkbox-box.checked{background:var(--brass);border-color:var(--brass);color:#FFFFFF;}
 </style>
 </head>
 <body>
@@ -620,12 +657,33 @@ function HomeTab({ student, notices }){
   const todayDow = new Date().getDay();
   const schedule = student.schedule || [];
   const latestNotice = notices[0];
+  const [myReservations, setMyReservations] = useState([]);
+
+  useEffect(()=>{
+    const unsub = db.collection(COL_RESERVATIONS).where('studentId','==',student.id).onSnapshot(snap=>{
+      setMyReservations(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return ()=>unsub();
+  }, [student.id]);
+
+  const todayStr = fmtDate(new Date());
+  const maxStr = fmtDate(addDays(new Date(),7));
+  const upcoming = myReservations
+    .filter(r=> r.date >= todayStr && r.date <= maxStr)
+    .sort((a,b)=> a.date===b.date ? toMin(a.start)-toMin(b.start) : (a.date<b.date?-1:1));
+
+  function fmtResDate(ds){
+    const d = new Date(ds+'T00:00:00');
+    return (ds===todayStr?'오늘 · ':'') + (d.getMonth()+1)+'월 '+d.getDate()+'일('+DOW[d.getDay()]+')';
+  }
 
   return (
     <div className="screen">
-      <div className="eyebrow">WELCOME</div>
-      <h1 className="page-title">{student.name}님, 안녕하세요 🥁</h1>
-      <p className="page-sub">{student.type === 'exam' ? '입시생' : '취미생'} 과정으로 등록되어 있어요.</p>
+      <div className="hero-card">
+        <div className="hero-eyebrow">WELCOME</div>
+        <div className="hero-name">{student.name}님, 안녕하세요 🥁</div>
+        <div className="hero-sub">{student.type === 'exam' ? '입시생' : '취미생'} 과정으로 등록되어 있어요.</div>
+      </div>
 
       <div className="card">
         <div className="card-title">📋 내 수업시간</div>
@@ -640,6 +698,26 @@ function HomeTab({ student, notices }){
             <div>
               <div className="schedule-time">{s.start} – {s.end}</div>
               <div className="notice-date" style={{marginTop:2, marginBottom:0}}>{s.day}요일 레슨</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="card-title">🥁 내 연습실 예약</div>
+        {upcoming.length === 0 ? (
+          <div className="empty-state">
+            <div className="icon">🎫</div>
+            <p>예정된 연습실 예약이 없어요.<br/>예약 탭에서 연습실을 예약해보세요.</p>
+          </div>
+        ) : upcoming.map(r=>(
+          <div className="res-row" key={r.id}>
+            <div style={{display:'flex',alignItems:'center'}}>
+              <div className="room-badge">{roomLabel(r.room)}</div>
+              <div>
+                <div className="res-time">{r.start} – {r.end}</div>
+                <div className="res-sub">{fmtResDate(r.date)}</div>
+              </div>
             </div>
           </div>
         ))}
@@ -674,15 +752,16 @@ function ReserveTab({ student }){
   const slots = useMemo(()=> generateHalfHourSlots(hours), [hours]);
   const limitSlots = dailyLimitSlots(student.type);
 
+  const [showCalendar, setShowCalendar] = useState(false);
+
   const dates = useMemo(()=>{
     const arr = [];
     let d = new Date(); d.setHours(0,0,0,0);
-    for(let i=0; i<14 && arr.length<12; i++){
-      const cand = addDays(d,i);
-      if(cand.getDay() !== 0) arr.push(cand);
-    }
+    for(let i=0; i<=7; i++) arr.push(addDays(d,i));
     return arr;
   }, []);
+  const minDate = fmtDate(dates[0]);
+  const maxDate = fmtDate(dates[dates.length-1]);
 
   useEffect(()=>{
     if(!availableRooms.includes(selRoom)) setSelRoom(availableRooms[0]);
@@ -778,20 +857,29 @@ function ReserveTab({ student }){
       <h1 className="page-title">연습실 예약</h1>
       <p className="page-sub">{student.type==='exam' ? '입시생: 1일 최대 3시간(6칸). 한 방에서 최대 2시간(4칸) 연속 사용 후엔 같은 방은 30분 휴식, 다른 방은 언제든 이용 가능해요.' : '취미생: 1일 최대 1시간(2칸)'}</p>
 
-      <div className="date-scroll">
-        {dates.map(d=>{
-          const ds = fmtDate(d);
-          const isToday = ds === fmtDate(new Date());
-          return (
-            <div key={ds} className={"date-chip"+(ds===selDate?' active':'')+(isToday?' today':'')} onClick={()=>setSelDate(ds)}>
-              <div className="dow">{DOW[d.getDay()]}</div>
-              <div className="num">{d.getDate()}</div>
-            </div>
-          );
-        })}
+      <div className="date-scroll-row">
+        <div className="date-scroll">
+          {dates.map(d=>{
+            const ds = fmtDate(d);
+            const isToday = ds === fmtDate(new Date());
+            return (
+              <div key={ds} className={"date-chip"+(ds===selDate?' active':'')+(isToday?' today':'')} onClick={()=>setSelDate(ds)}>
+                <div className="dow">{DOW[d.getDay()]}</div>
+                <div className="num">{d.getDate()}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="cal-toggle-btn" onClick={()=>setShowCalendar(true)}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8 3.5v3M16 3.5v3"/></svg>
+        </div>
       </div>
+      <p style={{fontSize:11.5,color:'var(--text-faint)',marginTop:8,marginBottom:16}}>오늘부터 7일 이내 날짜만 예약할 수 있어요.</p>
 
-      <div className="budget-bar-wrap">
+      {showCalendar && (
+        <DatePickerModal selDate={selDate} minDate={minDate} maxDate={maxDate}
+          onSelect={(ds)=>setSelDate(ds)} onClose={()=>setShowCalendar(false)} />
+      )}
         <div style={{display:'flex',justifyContent:'space-between',fontSize:'12px',color:'var(--text-muted)'}}>
           <span>오늘 남은 예약 가능 시간{draftSlots.length>0 && ' (선택 반영)'}</span>
           <span style={{fontFamily:'var(--font-mono)',color:'var(--brass-bright)',fontWeight:700}}>{Math.floor(remainMin/60)}시간 {remainMin%60}분</span>
@@ -877,6 +965,65 @@ function ReserveTab({ student }){
             <div className="cancel-x" onClick={()=>cancelReservation(r.id)}>✕</div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   DATE PICKER MODAL (달력 형태로 날짜 선택)
+   ============================================================ */
+function DatePickerModal({ selDate, minDate, maxDate, onSelect, onClose }){
+  const initial = new Date(selDate+'T00:00:00');
+  const [viewYear, setViewYear] = useState(initial.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initial.getMonth());
+
+  function inRange(d){
+    const ds = fmtDate(d);
+    return ds >= minDate && ds <= maxDate;
+  }
+
+  const firstOfMonth = new Date(viewYear, viewMonth, 1);
+  const startWeekday = firstOfMonth.getDay();
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+  const cells = [];
+  for(let i=0;i<startWeekday;i++) cells.push(null);
+  for(let d=1; d<=daysInMonth; d++) cells.push(new Date(viewYear, viewMonth, d));
+
+  function prevMonth(){ if(viewMonth===0){ setViewYear(viewYear-1); setViewMonth(11); } else setViewMonth(viewMonth-1); }
+  function nextMonth(){ if(viewMonth===11){ setViewYear(viewYear+1); setViewMonth(0); } else setViewMonth(viewMonth+1); }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div className="modal-close-row">
+          <div className="modal-title">날짜 선택</div>
+          <div className="icon-btn" onClick={onClose}>✕</div>
+        </div>
+        <div className="cal-nav">
+          <div className="cal-nav-btn" onClick={prevMonth}>‹</div>
+          <div className="cal-month-label">{viewYear}년 {viewMonth+1}월</div>
+          <div className="cal-nav-btn" onClick={nextMonth}>›</div>
+        </div>
+        <div className="cal-dow-row">
+          {DOW.map(d=><div key={d} className="cal-dow">{d}</div>)}
+        </div>
+        <div className="cal-grid">
+          {cells.map((d,i)=>{
+            if(!d) return <div key={i} className="cal-cell empty">-</div>;
+            const ds = fmtDate(d);
+            const ok = inRange(d);
+            const isSel = ds === selDate;
+            return (
+              <div key={i} className={"cal-cell"+(ok?' avail':' disabled')+(isSel?' selected':'')}
+                onClick={()=>{ if(ok){ onSelect(ds); onClose(); } }}>
+                {d.getDate()}
+              </div>
+            );
+          })}
+        </div>
+        <p style={{fontSize:12,color:'var(--text-muted)',marginTop:16,marginBottom:0,textAlign:'center'}}>오늘부터 7일 이내 날짜만 예약할 수 있어요.</p>
       </div>
     </div>
   );
