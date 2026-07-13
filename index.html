@@ -269,8 +269,8 @@
   .tt-cell:last-child{border-right:none;}
   .tt-cell.empty{color:var(--text-faint);font-size:11px;}
   .tt-cell.booked{background:var(--brass-soft);cursor:pointer;}
-  .tt-cell.absent{background:var(--rec-soft);cursor:pointer;}
-  .tt-cell.makeup{background:#E7F0FE;cursor:pointer;}
+  .tt-cell.absent{background:var(--rec);cursor:pointer;}
+  .tt-cell.makeup{background:#2E6FE8;cursor:pointer;}
   .tt-cell.booked:active{filter:brightness(0.95);}
   .tt-name{font-size:12px;font-weight:800;color:var(--brass-bright);line-height:1.3;}
   .tt-type{font-size:9.5px;color:var(--text-muted);margin-top:1px;}
@@ -1991,8 +1991,8 @@ function AdminTimetableTab(){
 
       <div className="legend" style={{marginBottom:14}}>
         <div className="legend-item"><div className="legend-dot" style={{background:'var(--brass-soft)',border:'1px solid var(--brass)'}}/>정규 수업</div>
-        <div className="legend-item"><div className="legend-dot" style={{background:'var(--rec-soft)',border:'1px solid var(--rec)'}}/>결석</div>
-        <div className="legend-item"><div className="legend-dot" style={{background:'#E7F0FE',border:'1px solid #2E6FE8'}}/>보강</div>
+        <div className="legend-item"><div className="legend-dot" style={{background:'var(--rec)'}}/>결석</div>
+        <div className="legend-item"><div className="legend-dot" style={{background:'#2E6FE8'}}/>보강</div>
       </div>
 
       <div className="timetable-wrap">
@@ -2015,21 +2015,25 @@ function AdminTimetableTab(){
                 <td className="tt-time">{h}</td>
                 {DAYS.map((day,i)=>{
                   const cell = cellData(i, h);
+                  const cls = cellClass(cell);
+                  const solidAbsent = cls === 'tt-cell absent';
+                  const solidMakeup = cls === 'tt-cell makeup';
                   return (
-                    <td key={i} className={cellClass(cell)} style={{cursor:'pointer'}} onClick={()=>setEditingCell(cell)}>
+                    <td key={i} className={cls} style={{cursor:'pointer'}} onClick={()=>setEditingCell(cell)}>
                       {cell.regularEntries.map(en=>{
                         const absent = cell.absenceOverrides.some(a=>a.studentId===en.id);
+                        const col = (solidAbsent || solidMakeup) ? '#FFFFFF' : (absent ? 'var(--rec)' : undefined);
                         return (
                           <div key={en.id} style={{marginBottom:2}}>
-                            <div className="tt-name" style={absent?{color:'var(--rec)',textDecoration:'line-through'}:{}}>{en.name}</div>
-                            <div className="tt-type" style={absent?{color:'var(--rec)'}:{}}>{absent?'결석':(en.type==='exam'?'입시':'취미')}</div>
+                            <div className="tt-name" style={{color:col, textDecoration: absent?'line-through':'none'}}>{en.name}</div>
+                            <div className="tt-type" style={{color:col}}>{absent?'결석':(en.type==='exam'?'입시':'취미')}</div>
                           </div>
                         );
                       })}
                       {cell.makeupOverrides.map(mo=>(
                         <div key={mo.id}>
-                          <div className="tt-name" style={{color:'#2E6FE8'}}>{mo.studentName}</div>
-                          <div className="tt-type" style={{color:'#2E6FE8'}}>보강</div>
+                          <div className="tt-name" style={{color:'#FFFFFF'}}>{mo.studentName}</div>
+                          <div className="tt-type" style={{color:'#FFFFFF'}}>보강</div>
                         </div>
                       ))}
                       {cell.regularEntries.length===0 && cell.makeupOverrides.length===0 && '·'}
