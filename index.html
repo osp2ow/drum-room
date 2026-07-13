@@ -524,6 +524,7 @@ const Icon = {
   user: (p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1-4 4-6 7-6s6 2 7 6"/></svg>),
   grid: (p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>),
   lock: (p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}><rect x="5" y="10.5" width="14" height="9" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>),
+  clock: (p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.3 2"/></svg>),
 };
 
 function LogoMark(){
@@ -1904,6 +1905,76 @@ function NoticeEditModal({ notice, onClose }){
 }
 
 /* ============================================================
+   ADMIN: TIMETABLE TAB (전체 학생 수업 시간표)
+   ============================================================ */
+function AdminTimetableTab(){
+  const [students, setStudents] = useState([]);
+
+  useEffect(()=>{
+    const unsub = db.collection(COL_STUDENTS).orderBy('name').onSnapshot(snap=>{
+      setStudents(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return ()=>unsub();
+  }, []);
+
+  const DAYS = ['월','화','수','목','금'];
+  const HOURS = BLOCK_HOURS.slice(0,-1); // 13:00 ~ 21:00 (시작 시간 기준)
+
+  function findEntries(day, hour){
+    const list = [];
+    students.forEach(s=>{
+      (s.schedule||[]).forEach(sch=>{
+        if(sch.day===day && sch.start===hour) list.push({ name:s.name, type:s.type });
+      });
+    });
+    return list;
+  }
+
+  return (
+    <div className="screen">
+      <div className="eyebrow">ADMIN</div>
+      <h1 className="page-title">수업 시간표</h1>
+      <p className="page-sub">학생 관리에서 등록한 수업시간이 자동으로 반영돼요. (월~금, 13:00~22:00)</p>
+      <div className="timetable-wrap">
+        <table className="timetable">
+          <colgroup>
+            <col style={{width:'52px'}} />
+            {DAYS.map(d=><col key={d} style={{width:'auto'}} />)}
+          </colgroup>
+          <thead>
+            <tr>
+              <th className="tt-time-h"></th>
+              {DAYS.map(d=><th key={d}>{d}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {HOURS.map(h=>(
+              <tr key={h}>
+                <td className="tt-time">{h}</td>
+                {DAYS.map(d=>{
+                  const entries = findEntries(d,h);
+                  if(entries.length===0) return <td key={d} className="tt-cell empty">·</td>;
+                  return (
+                    <td key={d} className="tt-cell booked">
+                      {entries.map((en,i)=>(
+                        <div key={i} style={{marginBottom:i<entries.length-1?4:0}}>
+                          <div className="tt-name">{en.name}</div>
+                          <div className="tt-type">{en.type==='exam'?'입시':'취미'}</div>
+                        </div>
+                      ))}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    ADMIN SHELL
    ============================================================ */
 function AdminShell({ onLogout }){
@@ -1912,6 +1983,7 @@ function AdminShell({ onLogout }){
   useEffect(()=>{ localStorage.setItem('juniper_admin_tab', tab); }, [tab]);
   const tabs = [
     { key:'students', label:'학생', icon:<Icon.user/> },
+    { key:'timetable', label:'시간표', icon:<Icon.clock/> },
     { key:'reservations', label:'예약', icon:<Icon.cal/> },
     { key:'blocks', label:'차단', icon:<Icon.lock/> },
     { key:'notices', label:'공지', icon:<Icon.bell/> },
@@ -1920,6 +1992,7 @@ function AdminShell({ onLogout }){
     <React.Fragment>
       <AppHeader subtitle="ADMIN MODE" right={<span onClick={onLogout} style={{cursor:'pointer',textDecoration:'underline'}}>로그아웃</span>} />
       {tab==='students' && <AdminStudentsTab/>}
+      {tab==='timetable' && <AdminTimetableTab/>}
       {tab==='reservations' && <AdminReservationsTab/>}
       {tab==='blocks' && <AdminBlocksTab/>}
       {tab==='notices' && <AdminNoticesTab/>}
