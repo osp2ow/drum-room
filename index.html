@@ -1185,11 +1185,8 @@ function StatusTab({ student, blocks }){
     return ()=>unsub();
   }, [todayStr]);
 
-  const nowMin = (()=>{ const n = new Date(); return n.getHours()*60 + n.getMinutes(); })();
-
   function slotStatus(room, time){
     const s = toMin(time), e = s + 30;
-    if(s < nowMin) return 'past';
     const booked = dayReservations.some(r => Number(r.room)===room && toMin(r.start)<e && s<toMin(r.end));
     if(booked) return 'other';
     const closed = blocks.some(b => Number(b.room)===room && b.day===todayDow && toMin(b.start)<e && s<toMin(b.end));
