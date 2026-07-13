@@ -1207,8 +1207,8 @@ function StatusTab({ student, blocks }){
   return (
     <div className="screen">
       <div className="eyebrow">TODAY STATUS</div>
-      <h1 className="page-title">오늘의 예약 현황</h1>
-      <p className="page-sub" style={{color:'var(--text)',fontWeight:600}}>{fmtKDate(dateObj)} 기준, 비어있는 방을 확인하세요.</p>
+      <h1 className="page-title">{dateObj.getMonth()+1}월 {dateObj.getDate()}일 오늘의 예약현황</h1>
+      <p className="page-sub" style={{color:'var(--text)',fontWeight:600}}>비어있는 방을 확인하세요.</p>
 
       {!hours ? (
         <div className="info-box">일요일은 학원 휴무일이에요.</div>
