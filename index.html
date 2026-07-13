@@ -213,8 +213,8 @@
     background:var(--surface);border:1px solid var(--border);cursor:pointer;
   }
   .date-chip.active{background:var(--brass);border-color:var(--brass);}
-  .date-chip .dow{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);}
-  .date-chip.active .dow{color:#3a2f06;}
+  .date-chip .dow{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text-muted);}
+  .date-chip.active .dow{color:rgba(255,255,255,0.9);}
   .date-chip .num{font-family:var(--font-display);font-size:16px;font-weight:700;margin-top:2px;}
   .date-chip.active .num{color:#FFFFFF;}
   .date-chip.today .num::after{content:'';display:block;width:4px;height:4px;border-radius:50%;background:var(--rec);margin:3px auto 0;}
@@ -290,6 +290,7 @@
   .notice-item.important{border-color:rgba(47,191,175,0.4);background:linear-gradient(160deg, var(--brass-soft), var(--surface) 60%);}
   .notice-title{font-family:var(--font-display);font-weight:700;font-size:14.5px;margin-bottom:6px;display:flex;align-items:center;gap:7px;}
   .notice-date{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);margin-bottom:8px;}
+  .schedule-sub{font-family:var(--font-body);font-size:13.5px;font-weight:600;color:var(--text-muted);margin-top:3px;}
   .notice-body{font-size:13px;color:var(--text-muted);line-height:1.65;white-space:pre-wrap;}
 
   .schedule-row{display:flex;align-items:center;padding:14px 0;border-bottom:1px solid var(--border);}
@@ -739,7 +740,7 @@ function HomeTab({ student, notices }){
             <div className={"schedule-day"+(DOW.indexOf(s.day)===todayDow?' today':'')}>{s.day}</div>
             <div>
               <div className="schedule-time">{s.start} – {s.end}</div>
-              <div className="notice-date" style={{marginTop:2, marginBottom:0}}>{s.day}요일 레슨</div>
+              <div className="schedule-sub">{s.day}요일 레슨</div>
             </div>
           </div>
         ))}
@@ -1356,15 +1357,23 @@ function AdminStudentsTab(){
 function StudentEditModal({ student, onClose }){
   const [type, setTypeState] = useState(student.type);
   const [schedule, setSchedule] = useState(student.schedule || []);
-  const [newDay, setNewDay] = useState('월');
-  const [newStart, setNewStart] = useState('16:00');
-  const [newEnd, setNewEnd] = useState('17:00');
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState('');
 
   function flashSaved(msg){
     setJustSaved(msg);
     setTimeout(()=> setJustSaved(''), 2200);
+  }
+
+  async function persist(next, msg){
+    setSaving(true);
+    try{
+      await db.collection(COL_STUDENTS).doc(student.id).update({ schedule: next });
+      setSchedule(next);
+      flashSaved(msg);
+    }
+    catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
+    setSaving(false);
   }
 
   async function chooseType(t){
@@ -1374,24 +1383,21 @@ function StudentEditModal({ student, onClose }){
     catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
     setSaving(false);
   }
-  async function addSchedule(){
-    if(toMin(newEnd) <= toMin(newStart)){ alert('종료 시간이 시작 시간보다 늦어야 해요.'); return; }
-    const next = [...schedule, { day:newDay, start:newStart, end:newEnd }];
-    setSaving(true);
-    try{
-      await db.collection(COL_STUDENTS).doc(student.id).update({ schedule: next });
-      setSchedule(next);
-      flashSaved(`✓ ${newDay}요일 ${newStart}–${newEnd} 수업이 저장됐어요.`);
-    }
-    catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
-    setSaving(false);
+  function updateRow(i, field, value){
+    const next = schedule.map((s,idx)=>{
+      if(idx!==i) return s;
+      if(field==='start') return { ...s, start:value, end:toTime(toMin(value)+60) };
+      return { ...s, [field]:value };
+    });
+    persist(next, `✓ ${next[i].day}요일 ${next[i].start}–${next[i].end} 저장됐어요.`);
   }
-  async function removeSchedule(i){
+  function addSchedule(){
+    const next = [...schedule, { day:'월', start:'13:00', end:'14:00' }];
+    persist(next, '✓ 수업시간이 추가됐어요. 요일·시간을 선택해주세요.');
+  }
+  function removeSchedule(i){
     const next = schedule.filter((_,idx)=>idx!==i);
-    setSaving(true);
-    try{ await db.collection(COL_STUDENTS).doc(student.id).update({ schedule: next }); setSchedule(next); flashSaved('✓ 수업시간이 삭제됐어요.'); }
-    catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
-    setSaving(false);
+    persist(next, '✓ 수업시간이 삭제됐어요.');
   }
   async function del(){
     if(!window.confirm(student.name+' 학생을 삭제할까요? 예약 내역은 삭제되지 않아요.')) return;
@@ -1410,7 +1416,7 @@ function StudentEditModal({ student, onClose }){
         {justSaved ? (
           <div className="info-box" style={{marginTop:-4}}>{justSaved}</div>
         ) : (
-          <p style={{fontSize:11.5,color:'var(--text-faint)',marginTop:-8,marginBottom:16}}>{saving ? '저장 중...' : '아래 버튼을 눌러야 저장돼요.'}</p>
+          <p style={{fontSize:11.5,color:'var(--text-faint)',marginTop:-8,marginBottom:16}}>{saving ? '저장 중...' : '요일·시간을 바꾸면 바로 저장돼요.'}</p>
         )}
 
         <div className="input-label">수강 유형</div>
@@ -1419,26 +1425,21 @@ function StudentEditModal({ student, onClose }){
           <div className={"toggle-opt"+(type==='exam'?' active':'')} onClick={()=>chooseType('exam')}>입시생</div>
         </div>
 
-        <div className="input-label">등록된 수업시간</div>
+        <div className="input-label">수업시간 (1시간 단위)</div>
         {schedule.length === 0 ? (
-          <p style={{fontSize:12.5,color:'var(--text-faint)',margin:'2px 0 12px'}}>아직 등록된 수업시간이 없어요. 아래에서 추가해주세요.</p>
+          <p style={{fontSize:12.5,color:'var(--text-faint)',margin:'2px 0 12px'}}>아직 등록된 수업시간이 없어요. 아래 버튼으로 추가해주세요.</p>
         ) : schedule.map((s,i)=>(
           <div className="mini-add-row" key={i}>
-            <div className="input" style={{flex:'0 0 44px',textAlign:'center'}}>{s.day}</div>
-            <div className="input" style={{flex:1,textAlign:'center'}}>{s.start} – {s.end}</div>
+            <select className="input" style={{flex:'0 0 66px'}} value={s.day} onChange={e=>updateRow(i,'day',e.target.value)}>
+              {['월','화','수','목','금','토','일'].map(d=><option key={d} value={d}>{d}</option>)}
+            </select>
+            <select className="input" style={{flex:1}} value={s.start} onChange={e=>updateRow(i,'start',e.target.value)}>
+              {BLOCK_HOURS.slice(0,-1).map(h=><option key={h} value={h}>{h} – {toTime(toMin(h)+60)}</option>)}
+            </select>
             <div className="remove-chip" onClick={()=>removeSchedule(i)}>✕</div>
           </div>
         ))}
-
-        <div className="input-label" style={{marginTop:14}}>새 수업시간 등록</div>
-        <div className="mini-add-row" style={{marginTop:6}}>
-          <select className="input" style={{flex:'0 0 66px'}} value={newDay} onChange={e=>setNewDay(e.target.value)}>
-            {['월','화','수','목','금','토','일'].map(d=><option key={d} value={d}>{d}</option>)}
-          </select>
-          <input className="input" type="time" value={newStart} onChange={e=>setNewStart(e.target.value)} />
-          <input className="input" type="time" value={newEnd} onChange={e=>setNewEnd(e.target.value)} />
-        </div>
-        <button className="btn" disabled={saving} style={{marginTop:10,marginBottom:20}} onClick={addSchedule}>{saving ? '저장 중...' : `${newDay}요일 ${newStart}–${newEnd} 저장하기`}</button>
+        <button className="btn btn-ghost btn-sm" style={{width:'100%',marginTop:10,marginBottom:20}} disabled={saving} onClick={addSchedule}>+ 수업시간 추가</button>
 
         <button className="btn btn-danger" onClick={del}>학생 삭제</button>
       </div>
