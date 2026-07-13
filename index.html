@@ -237,6 +237,17 @@
   .slot-cell.selected{background:var(--brass);border-color:var(--brass);color:#FFFFFF;font-weight:800;cursor:pointer;box-shadow:0 3px 8px rgba(47,191,175,0.35);}
   .slot-cell.blocked{opacity:0.35;}
   .slot-cell.blocked::after{content:'🚫';position:absolute;font-size:15px;opacity:0.85;}
+  .slot-cell.closed{background:var(--surface-3);border-color:var(--border);color:var(--text-faint);}
+  .slot-cell.closed::after{content:'🔒';position:absolute;font-size:14px;opacity:0.7;}
+  .status-badge{
+    display:inline-flex;align-items:center;padding:8px 14px;border-radius:100px;
+    font-family:var(--font-display);font-weight:700;font-size:13.5px;
+  }
+  .status-badge.open{background:var(--brass-soft);color:var(--brass-bright);}
+  .status-badge.full{background:var(--rec-soft);color:#C7383C;}
+
+  .ptr-indicator{overflow:hidden;display:flex;align-items:center;justify-content:center;transition:height .15s ease;}
+  .ptr-arrow{font-size:20px;color:var(--brass-bright);transition:transform .1s linear;}
   .slot-cell .dot{width:4px;height:4px;border-radius:50%;background:var(--rec);position:absolute;top:4px;right:4px;}
   .legend{display:flex;gap:14px;margin-bottom:20px;flex-wrap:wrap;}
   .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);font-weight:500;}
@@ -387,6 +398,7 @@ const ADMIN_PASSWORD = "admin6537"; // 원장님 비밀번호 - 원하는 값으
 const COL_STUDENTS = "juniper_students";
 const COL_RESERVATIONS = "juniper_reservations";
 const COL_NOTICES = "juniper_notices";
+const COL_BLOCKS = "juniper_blocks";
 
 /* ============================================================
    HELPERS
@@ -477,6 +489,8 @@ const Icon = {
   cal: (p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}><rect x="4" y="5.5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8 3.5v3M16 3.5v3"/></svg>),
   bell: (p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}><path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>),
   user: (p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1-4 4-6 7-6s6 2 7 6"/></svg>),
+  grid: (p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>),
+  lock: (p)=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...p}><rect x="5" y="10.5" width="14" height="9" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>),
 };
 
 function LogoMark(){
@@ -737,7 +751,7 @@ function HomeTab({ student, notices }){
 /* ============================================================
    STUDENT: RESERVE TAB
    ============================================================ */
-function ReserveTab({ student }){
+function ReserveTab({ student, blocks }){
   const availableRooms = useMemo(()=> getAvailableRooms(student.type), [student.type]);
   const [selDate, setSelDate] = useState(fmtDate(new Date()));
   const [selRoom, setSelRoom] = useState(availableRooms[0]);
@@ -751,15 +765,17 @@ function ReserveTab({ student }){
   const hours = useMemo(()=> getOperatingHours(dateObj), [dateObj]);
   const slots = useMemo(()=> generateHalfHourSlots(hours), [hours]);
   const limitSlots = dailyLimitSlots(student.type);
+  const dow = DOW[dateObj.getDay()];
 
   const [showCalendar, setShowCalendar] = useState(false);
 
+  const todayKey = fmtDate(new Date()); // 자정이 지나면 값이 바뀌면서 날짜창이 다시 계산돼요
   const dates = useMemo(()=>{
     const arr = [];
     let d = new Date(); d.setHours(0,0,0,0);
     for(let i=0; i<=7; i++) arr.push(addDays(d,i));
     return arr;
-  }, []);
+  }, [todayKey]);
   const minDate = fmtDate(dates[0]);
   const maxDate = fmtDate(dates[dates.length-1]);
 
@@ -787,6 +803,8 @@ function ReserveTab({ student }){
     const s = toMin(time), e = s + 30;
     const isOther = dayReservations.some(r => Number(r.room)===room && r.studentId!==student.id && toMin(r.start)<e && s<toMin(r.end));
     if(isOther) return 'other';
+    const isClosed = blocks.some(b => Number(b.room)===room && b.day===dow && toMin(b.start)<e && s<toMin(b.end));
+    if(isClosed) return 'closed';
     if(existingSlots.some(sl=>sl.room===room && sl.time===time)) return 'mine';
     if(draftSlots.some(sl=>sl.room===room && sl.time===time)) return 'selected';
     const ok = canAddSlot(student.type, existingSlots.concat(draftSlots), room, time);
@@ -816,6 +834,12 @@ function ReserveTab({ student }){
         return freshList.some(r=>r.studentId!==student.id && Number(r.room)===sl.room && toMin(r.start)<e && s<toMin(r.end));
       });
       if(conflict){ setMsg('방금 다른 학생이 예약해서 시간이 겹쳐요. 선택을 확인해주세요.'); setSubmitting(false); return; }
+
+      const blockConflict = draftSlots.some(sl=>{
+        const s = toMin(sl.time), e = s+30;
+        return blocks.some(b=> Number(b.room)===sl.room && b.day===dow && toMin(b.start)<e && s<toMin(b.end));
+      });
+      if(blockConflict){ setMsg('선택한 시간 중 예약이 막혀있는 시간이 포함되어 있어요. 선택을 다시 확인해주세요.'); setSubmitting(false); return; }
 
       const freshExisting = expandToSlots(freshList.filter(r=>r.studentId===student.id));
       let running = freshExisting.slice();
@@ -911,7 +935,7 @@ function ReserveTab({ student }){
                     const st = slotState(selRoom, t);
                     return (
                       <div key={t} className={"slot-cell "+st} onClick={()=>toggleSlot(selRoom, t)}>
-                        {st!=='blocked' && t}
+                        {st!=='blocked' && st!=='closed' && t}
                       </div>
                     );
                   })}
@@ -922,6 +946,7 @@ function ReserveTab({ student }){
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--brass-soft)',border:'1px solid var(--brass)'}}/>내 예약</div>
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--rec-soft)',border:'1px solid var(--rec)'}}/>예약됨</div>
                   <div className="legend-item">🚫 규칙상 불가</div>
+                  <div className="legend-item">🔒 예약 불가(관리자 차단)</div>
                 </div>
               </React.Fragment>
             )}
@@ -1034,12 +1059,9 @@ function DatePickerModal({ selDate, minDate, maxDate, onSelect, onClose }){
 /* ============================================================
    STUDENT: NOTICE TAB
    ============================================================ */
-function NoticeTab({ notices }){
+function NoticeList({ notices }){
   return (
-    <div className="screen">
-      <div className="eyebrow">ANNOUNCEMENTS</div>
-      <h1 className="page-title">학원 안내사항</h1>
-      <p className="page-sub">주니퍼 실용음악학원의 최신 소식을 확인하세요.</p>
+    <React.Fragment>
       {notices.length===0 ? (
         <div className="empty-state"><div className="icon">📭</div><p>아직 등록된 공지사항이 없어요.</p></div>
       ) : notices.map(n=>(
@@ -1049,6 +1071,94 @@ function NoticeTab({ notices }){
           <div className="notice-body">{n.content}</div>
         </div>
       ))}
+    </React.Fragment>
+  );
+}
+
+/* ============================================================
+   STUDENT: STATUS TAB (오늘의 방별 예약 현황)
+   ============================================================ */
+function StatusTab({ blocks }){
+  const [selRoom, setSelRoom] = useState(1);
+  const [dayReservations, setDayReservations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const todayStr = fmtDate(new Date());
+  const dateObj = useMemo(()=> new Date(todayStr+'T00:00:00'), [todayStr]);
+  const hours = useMemo(()=> getOperatingHours(dateObj), [dateObj]);
+  const slots = useMemo(()=> generateHalfHourSlots(hours), [hours]);
+  const todayDow = DOW[dateObj.getDay()];
+
+  useEffect(()=>{
+    setLoading(true);
+    const unsub = db.collection(COL_RESERVATIONS).where('date','==',todayStr).onSnapshot(snap=>{
+      setDayReservations(snap.docs.map(d=>({id:d.id,...d.data()})));
+      setLoading(false);
+    }, err=>{ console.error(err); setLoading(false); });
+    return ()=>unsub();
+  }, [todayStr]);
+
+  function slotStatus(room, time){
+    const s = toMin(time), e = s + 30;
+    const booked = dayReservations.some(r => Number(r.room)===room && toMin(r.start)<e && s<toMin(r.end));
+    if(booked) return 'other';
+    const closed = blocks.some(b => Number(b.room)===room && b.day===todayDow && toMin(b.start)<e && s<toMin(b.end));
+    if(closed) return 'closed';
+    return 'free';
+  }
+
+  const roomStats = ROOMS.map(r=>{
+    const total = slots.length;
+    const takenCount = slots.filter(t=>slotStatus(r,t)!=='free').length;
+    return { room:r, total, takenCount, isFull: total>0 && takenCount>=total };
+  });
+  const currentStat = roomStats.find(s=>s.room===selRoom);
+
+  return (
+    <div className="screen">
+      <div className="eyebrow">TODAY STATUS</div>
+      <h1 className="page-title">오늘의 예약 현황</h1>
+      <p className="page-sub">{fmtKDate(dateObj)} 기준, 방을 선택해서 예약 가능 여부를 확인해보세요.</p>
+
+      {!hours ? (
+        <div className="info-box">일요일은 학원 휴무일이에요.</div>
+      ) : (
+        <React.Fragment>
+          <div className="room-tabs">
+            {ROOMS.map(r=>(
+              <div key={r} className={"room-tab"+(selRoom===r?' active':'')} onClick={()=>setSelRoom(r)}>
+                <div className="rn">ROOM</div>
+                <div className="rt">{roomLabel(r)}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="card">
+            <div className="card-title">{roomFullLabel(selRoom)} 현황</div>
+            {loading ? <div className="loading-spin"/> : (
+              <React.Fragment>
+                <div className={"status-badge "+(currentStat.isFull?'full':'open')}>
+                  {currentStat.isFull ? '오늘 예약 마감' : `${currentStat.total-currentStat.takenCount}칸 예약 가능`}
+                </div>
+                <div className="slot-grid" style={{marginTop:14}}>
+                  {slots.map(t=>{
+                    const st = slotStatus(selRoom, t);
+                    return (
+                      <div key={t} className={"slot-cell "+st}>
+                        {st==='free' ? t : (st==='closed' ? '' : '')}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="legend" style={{marginTop:14}}>
+                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--surface-2)',border:'1px solid rgba(47,191,175,0.35)'}}/>예약 비어있음</div>
+                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--rec-soft)',border:'1px solid var(--rec)'}}/>예약 마감</div>
+                  <div className="legend-item">🔒 이용불가</div>
+                </div>
+              </React.Fragment>
+            )}
+          </div>
+        </React.Fragment>
+      )}
     </div>
   );
 }
@@ -1056,7 +1166,7 @@ function NoticeTab({ notices }){
 /* ============================================================
    STUDENT: MY TAB
    ============================================================ */
-function MyTab({ student, onLogout }){
+function MyTab({ student, notices, onLogout }){
   return (
     <div className="screen">
       <div className="eyebrow">MY PAGE</div>
@@ -1070,7 +1180,11 @@ function MyTab({ student, onLogout }){
           <span className={"tag "+(student.type==='exam'?'tag-exam':'tag-hobby')}>{student.type==='exam'?'입시생':'취미생'}</span>
         </div>
       </div>
-      <div className="card">
+
+      <div className="card-title" style={{margin:'6px 0 12px'}}>📢 학원 공지사항</div>
+      <NoticeList notices={notices} />
+
+      <div className="card" style={{marginTop:4}}>
         <div className="card-title">이용 안내</div>
         <p style={{fontSize:12.5,color:'var(--text-muted)',lineHeight:1.7,margin:0}}>
           예약 및 수업시간 관련 문의는 원장님께 직접 연락해주세요.<br/>
@@ -1088,11 +1202,19 @@ function MyTab({ student, onLogout }){
 function StudentShell({ student, onLogout }){
   const [tab, setTab] = useState('home');
   const [notices, setNotices] = useState([]);
+  const [blocks, setBlocks] = useState([]);
   const [liveStudent, setLiveStudent] = useState(student);
 
   useEffect(()=>{
     const unsub = db.collection(COL_NOTICES).orderBy('createdAt','desc').onSnapshot(snap=>{
       setNotices(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return ()=>unsub();
+  }, []);
+
+  useEffect(()=>{
+    const unsub = db.collection(COL_BLOCKS).onSnapshot(snap=>{
+      setBlocks(snap.docs.map(d=>({id:d.id,...d.data()})));
     });
     return ()=>unsub();
   }, []);
@@ -1107,7 +1229,7 @@ function StudentShell({ student, onLogout }){
   const tabs = [
     { key:'home', label:'홈', icon:<Icon.home/> },
     { key:'reserve', label:'예약', icon:<Icon.cal/> },
-    { key:'notice', label:'공지', icon:<Icon.bell/> },
+    { key:'status', label:'현황', icon:<Icon.grid/> },
     { key:'my', label:'마이', icon:<Icon.user/> },
   ];
 
@@ -1115,9 +1237,9 @@ function StudentShell({ student, onLogout }){
     <React.Fragment>
       <AppHeader right={<span>{liveStudent.type==='exam'?'입시생':'취미생'}</span>} />
       {tab==='home' && <HomeTab student={liveStudent} notices={notices} />}
-      {tab==='reserve' && <ReserveTab student={liveStudent} />}
-      {tab==='notice' && <NoticeTab notices={notices} />}
-      {tab==='my' && <MyTab student={liveStudent} onLogout={onLogout} />}
+      {tab==='reserve' && <ReserveTab student={liveStudent} blocks={blocks} />}
+      {tab==='status' && <StatusTab blocks={blocks} />}
+      {tab==='my' && <MyTab student={liveStudent} notices={notices} onLogout={onLogout} />}
       <TabBar tabs={tabs} active={tab} onChange={setTab} />
     </React.Fragment>
   );
@@ -1239,6 +1361,7 @@ function StudentEditModal({ student, onClose }){
 function AdminReservationsTab(){
   const [selDate, setSelDate] = useState(fmtDate(new Date()));
   const [reservations, setReservations] = useState([]);
+  const [editing, setEditing] = useState(null);
 
   useEffect(()=>{
     const unsub = db.collection(COL_RESERVATIONS).where('date','==',selDate).onSnapshot(snap=>{
@@ -1246,11 +1369,6 @@ function AdminReservationsTab(){
     });
     return ()=>unsub();
   }, [selDate]);
-
-  async function cancel(id){
-    if(!window.confirm('이 예약을 취소할까요?')) return;
-    await db.collection(COL_RESERVATIONS).doc(id).delete();
-  }
 
   const dates = useMemo(()=>{
     const arr = []; let d = new Date(); d.setHours(0,0,0,0);
@@ -1262,6 +1380,7 @@ function AdminReservationsTab(){
     <div className="screen">
       <div className="eyebrow">ADMIN</div>
       <h1 className="page-title">예약 현황</h1>
+      <p className="page-sub">예약을 눌러서 시간·방을 수정하거나 취소할 수 있어요.</p>
       <div className="date-scroll">
         {dates.map(d=>{
           const ds = fmtDate(d);
@@ -1282,17 +1401,168 @@ function AdminReservationsTab(){
           <div className="card" key={room}>
             <div className="card-title">{roomFullLabel(room)}</div>
             {rs.map(r=>(
-              <div className="res-row" key={r.id}>
+              <div className="list-item-row" key={r.id} onClick={()=>setEditing(r)}>
                 <div>
-                  <div className="res-time">{r.start} – {r.end}</div>
-                  <div className="res-sub">{r.studentName} · {r.studentType==='exam'?'입시생':'취미생'}</div>
+                  <div className="name">{r.start} – {r.end}</div>
+                  <div className="meta">{r.studentName} · {r.studentType==='exam'?'입시생':'취미생'}</div>
                 </div>
-                <div className="cancel-x" onClick={()=>cancel(r.id)}>✕</div>
+                <span className="chev">›</span>
               </div>
             ))}
           </div>
         );
       })}
+      {editing && <ReservationEditModal reservation={editing} onClose={()=>setEditing(null)} />}
+    </div>
+  );
+}
+
+function ReservationEditModal({ reservation, onClose }){
+  const [room, setRoom] = useState(reservation.room);
+  const [date, setDate] = useState(reservation.date);
+  const [start, setStart] = useState(reservation.start);
+  const [end, setEnd] = useState(reservation.end);
+  const [saving, setSaving] = useState(false);
+
+  async function save(){
+    if(toMin(end) <= toMin(start)){ alert('종료 시간이 시작 시간보다 늦어야 해요.'); return; }
+    setSaving(true);
+    await db.collection(COL_RESERVATIONS).doc(reservation.id).update({ room: Number(room), date, start, end });
+    setSaving(false);
+    onClose();
+  }
+  async function del(){
+    if(!window.confirm('이 예약을 취소할까요?')) return;
+    await db.collection(COL_RESERVATIONS).doc(reservation.id).delete();
+    onClose();
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div className="modal-close-row">
+          <div className="modal-title">예약 수정</div>
+          <div className="icon-btn" onClick={onClose}>✕</div>
+        </div>
+        <p style={{fontSize:12.5,color:'var(--text-muted)',marginTop:0,marginBottom:16}}>{reservation.studentName} · {reservation.studentType==='exam'?'입시생':'취미생'}</p>
+
+        <div className="input-group">
+          <label className="input-label">방</label>
+          <select className="input" value={room} onChange={e=>setRoom(Number(e.target.value))}>
+            {ROOMS.map(r=><option key={r} value={r}>{roomFullLabel(r)}</option>)}
+          </select>
+        </div>
+        <div className="input-group">
+          <label className="input-label">날짜</label>
+          <input className="input" type="date" value={date} onChange={e=>setDate(e.target.value)} />
+        </div>
+        <div className="mini-add-row">
+          <input className="input" type="time" value={start} onChange={e=>setStart(e.target.value)} />
+          <input className="input" type="time" value={end} onChange={e=>setEnd(e.target.value)} />
+        </div>
+
+        <button className="btn" disabled={saving} onClick={save} style={{marginTop:18,marginBottom:10}}>{saving?'저장 중...':'저장하기'}</button>
+        <button className="btn btn-danger" onClick={del}>예약 취소</button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   ADMIN: BLOCKS TAB (특정 방·시간 지속 차단)
+   ============================================================ */
+function AdminBlocksTab(){
+  const [blocks, setBlocks] = useState([]);
+  const [editing, setEditing] = useState(null); // 'new' | block | null
+
+  useEffect(()=>{
+    const unsub = db.collection(COL_BLOCKS).onSnapshot(snap=>{
+      setBlocks(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=> (DOW.indexOf(a.day)-DOW.indexOf(b.day)) || toMin(a.start)-toMin(b.start)));
+    });
+    return ()=>unsub();
+  }, []);
+
+  return (
+    <div className="screen">
+      <div className="eyebrow">ADMIN</div>
+      <h1 className="page-title">예약 차단 관리</h1>
+      <p className="page-sub">매주 특정 요일·시간대에 특정 방을 예약할 수 없도록 지속적으로 막아둘 수 있어요. (예: 매주 화요일 2번방 점검)</p>
+      <button className="btn" style={{marginBottom:18}} onClick={()=>setEditing('new')}>+ 새 차단 추가</button>
+      {blocks.length===0 ? (
+        <div className="empty-state"><div className="icon">🔓</div><p>등록된 차단이 없어요.</p></div>
+      ) : blocks.map(b=>(
+        <div className="list-item-row" key={b.id} onClick={()=>setEditing(b)}>
+          <div>
+            <div className="name">매주 {b.day}요일 · {roomFullLabel(b.room)}</div>
+            <div className="meta">{b.start} – {b.end}{b.note ? ' · '+b.note : ''}</div>
+          </div>
+          <span className="chev">›</span>
+        </div>
+      ))}
+      {editing && <BlockEditModal block={editing==='new'?null:editing} onClose={()=>setEditing(null)} />}
+    </div>
+  );
+}
+
+function BlockEditModal({ block, onClose }){
+  const [day, setDay] = useState(block?.day || '월');
+  const [room, setRoom] = useState(block?.room || 1);
+  const [start, setStart] = useState(block?.start || '13:00');
+  const [end, setEnd] = useState(block?.end || '14:00');
+  const [note, setNote] = useState(block?.note || '');
+  const [saving, setSaving] = useState(false);
+
+  async function save(){
+    if(toMin(end) <= toMin(start)){ alert('종료 시간이 시작 시간보다 늦어야 해요.'); return; }
+    setSaving(true);
+    const data = { day, room: Number(room), start, end, note };
+    if(block) await db.collection(COL_BLOCKS).doc(block.id).update(data);
+    else await db.collection(COL_BLOCKS).add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    setSaving(false);
+    onClose();
+  }
+  async function del(){
+    if(!window.confirm('이 차단을 삭제할까요?')) return;
+    await db.collection(COL_BLOCKS).doc(block.id).delete();
+    onClose();
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div className="modal-close-row">
+          <div className="modal-title">{block ? '차단 수정' : '새 차단 추가'}</div>
+          <div className="icon-btn" onClick={onClose}>✕</div>
+        </div>
+
+        <div className="input-label">요일 (매주 반복)</div>
+        <div className="day-pill-row">
+          {['월','화','수','목','금','토','일'].map(d=>(
+            <div key={d} className={"day-pill"+(day===d?' active':'')} onClick={()=>setDay(d)}>{d}</div>
+          ))}
+        </div>
+
+        <div className="input-label" style={{marginTop:14}}>방</div>
+        <select className="input" value={room} onChange={e=>setRoom(Number(e.target.value))} style={{marginBottom:14}}>
+          {ROOMS.map(r=><option key={r} value={r}>{roomFullLabel(r)}</option>)}
+        </select>
+
+        <div className="input-label">시간</div>
+        <div className="mini-add-row">
+          <input className="input" type="time" value={start} onChange={e=>setStart(e.target.value)} />
+          <input className="input" type="time" value={end} onChange={e=>setEnd(e.target.value)} />
+        </div>
+
+        <div className="input-group" style={{marginTop:14}}>
+          <label className="input-label">메모 (선택)</label>
+          <input className="input" placeholder="예: 정기 점검" value={note} onChange={e=>setNote(e.target.value)} />
+        </div>
+
+        <button className="btn" disabled={saving} onClick={save} style={{marginTop:6,marginBottom:block?10:0}}>{saving?'저장 중...':'저장하기'}</button>
+        {block && <button className="btn btn-danger" onClick={del}>차단 삭제</button>}
+      </div>
     </div>
   );
 }
@@ -1387,6 +1657,7 @@ function AdminShell({ onLogout }){
   const tabs = [
     { key:'students', label:'학생', icon:<Icon.user/> },
     { key:'reservations', label:'예약', icon:<Icon.cal/> },
+    { key:'blocks', label:'차단', icon:<Icon.lock/> },
     { key:'notices', label:'공지', icon:<Icon.bell/> },
   ];
   return (
@@ -1394,8 +1665,71 @@ function AdminShell({ onLogout }){
       <AppHeader subtitle="ADMIN MODE" right={<span onClick={onLogout} style={{cursor:'pointer',textDecoration:'underline'}}>로그아웃</span>} />
       {tab==='students' && <AdminStudentsTab/>}
       {tab==='reservations' && <AdminReservationsTab/>}
+      {tab==='blocks' && <AdminBlocksTab/>}
       {tab==='notices' && <AdminNoticesTab/>}
       <TabBar tabs={tabs} active={tab} onChange={setTab} />
+    </React.Fragment>
+  );
+}
+
+/* ============================================================
+   PULL TO REFRESH (아래로 당겨서 새로고침)
+   ============================================================ */
+function PullToRefresh({ children }){
+  const [pullDist, setPullDist] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const startY = React.useRef(0);
+  const active = React.useRef(false);
+  const distRef = React.useRef(0);
+  const refreshingRef = React.useRef(false);
+
+  useEffect(()=>{
+    function onTouchStart(e){
+      if(window.scrollY <= 0 && !refreshingRef.current){
+        startY.current = e.touches[0].clientY;
+        active.current = true;
+      }
+    }
+    function onTouchMove(e){
+      if(!active.current) return;
+      const dy = e.touches[0].clientY - startY.current;
+      if(dy > 0 && window.scrollY <= 0){
+        const d = Math.min(dy*0.5, 90);
+        distRef.current = d;
+        setPullDist(d);
+      } else {
+        active.current = false;
+        distRef.current = 0;
+        setPullDist(0);
+      }
+    }
+    function onTouchEnd(){
+      if(active.current && distRef.current > 60){
+        refreshingRef.current = true;
+        setRefreshing(true);
+        setTimeout(()=> window.location.reload(), 300);
+      } else {
+        distRef.current = 0;
+        setPullDist(0);
+      }
+      active.current = false;
+    }
+    window.addEventListener('touchstart', onTouchStart, { passive:true });
+    window.addEventListener('touchmove', onTouchMove, { passive:true });
+    window.addEventListener('touchend', onTouchEnd, { passive:true });
+    return ()=>{
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+    };
+  }, []);
+
+  return (
+    <React.Fragment>
+      <div className="ptr-indicator" style={{ height: pullDist }}>
+        {refreshing ? <div className="loading-spin" style={{margin:'10px auto'}}/> : (pullDist>8 && <div className="ptr-arrow" style={{transform:`rotate(${Math.min(pullDist*2,180)}deg)`}}>↓</div>)}
+      </div>
+      {children}
     </React.Fragment>
   );
 }
@@ -1431,8 +1765,9 @@ function App(){
     setView('login');
   }
 
+  let content;
   if(FIREBASE_NOT_CONFIGURED){
-    return (
+    content = (
       <div className="auth-wrap">
         <div className="auth-logo">
           <div className="logo-mark"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#C9A227" strokeWidth="1.4"/></svg></div>
@@ -1447,21 +1782,19 @@ function App(){
         </p>
       </div>
     );
+  } else if(session === undefined){
+    content = <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}><div className="loading-spin"/></div>;
+  } else if(session === null){
+    content = view === 'adminLogin'
+      ? <AdminLoginScreen onAdminLogin={()=>setSession({type:'admin'})} onBack={()=>setView('login')} />
+      : <AuthScreen onStudentLogin={(student)=>setSession({type:'student', student})} onGoAdmin={()=>setView('adminLogin')} />;
+  } else if(session.type === 'admin'){
+    content = <AdminShell onLogout={logout} />;
+  } else {
+    content = <StudentShell student={session.student} onLogout={logout} />;
   }
 
-  if(session === undefined){
-    return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}><div className="loading-spin"/></div>;
-  }
-  if(session === null){
-    if(view === 'adminLogin'){
-      return <AdminLoginScreen onAdminLogin={()=>setSession({type:'admin'})} onBack={()=>setView('login')} />;
-    }
-    return <AuthScreen onStudentLogin={(student)=>setSession({type:'student', student})} onGoAdmin={()=>setView('adminLogin')} />;
-  }
-  if(session.type === 'admin'){
-    return <AdminShell onLogout={logout} />;
-  }
-  return <StudentShell student={session.student} onLogout={logout} />;
+  return <PullToRefresh>{content}</PullToRefresh>;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
