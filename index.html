@@ -201,6 +201,12 @@
   .hero-name{font-family:var(--font-display);font-size:22px;font-weight:800;margin-bottom:8px;letter-spacing:-0.01em;}
   .hero-sub{font-size:13.5px;color:rgba(255,255,255,0.92);line-height:1.55;}
 
+  .today-highlight{border:1.5px solid var(--brass);background:linear-gradient(160deg, var(--brass-soft), var(--surface) 65%);}
+
+  .date-chip{position:relative;}
+  .res-dot{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--rec);}
+  .res-dot.on-active{background:#FFFFFF;}
+
   .date-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;}
   .date-chip{
     flex-shrink:0;width:52px;padding:10px 0;border-radius:13px;text-align:center;
@@ -227,18 +233,17 @@
   .slot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px;}
   .slot-cell{
     aspect-ratio:1.3;border-radius:13px;border:1.5px solid var(--border);
-    background:var(--surface-2);display:flex;align-items:center;justify-content:center;
-    font-family:var(--font-mono);font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;
-    color:var(--text);position:relative;letter-spacing:0.01em;
+    background:var(--surface-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    font-family:var(--font-mono);color:var(--text);position:relative;letter-spacing:0.01em;
   }
+  .slot-cell .cell-time{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .slot-cell .cell-tag{font-size:9.5px;font-weight:800;letter-spacing:0.01em;}
   .slot-cell.free{border-color:rgba(47,191,175,0.35);cursor:pointer;}
   .slot-cell.mine{background:var(--brass-soft);border-color:var(--brass);color:var(--brass-bright);}
   .slot-cell.other{background:var(--rec-soft);border-color:rgba(255,90,95,0.3);color:#C7383C;}
   .slot-cell.selected{background:var(--brass);border-color:var(--brass);color:#FFFFFF;font-weight:800;cursor:pointer;box-shadow:0 3px 8px rgba(47,191,175,0.35);}
-  .slot-cell.blocked{opacity:0.35;}
-  .slot-cell.blocked::after{content:'🚫';position:absolute;font-size:15px;opacity:0.85;}
+  .slot-cell.blocked{opacity:0.4;}
   .slot-cell.closed{background:var(--surface-3);border-color:var(--border);color:var(--text-faint);}
-  .slot-cell.closed::after{content:'🔒';position:absolute;font-size:14px;opacity:0.7;}
   .status-badge{
     display:inline-flex;align-items:center;padding:8px 14px;border-radius:100px;
     font-family:var(--font-display);font-weight:700;font-size:13.5px;
@@ -680,16 +685,23 @@ function HomeTab({ student, notices }){
     return ()=>unsub();
   }, [student.id]);
 
+  const weekDates = useMemo(()=>{
+    const arr = []; let d = new Date(); d.setHours(0,0,0,0);
+    for(let i=0;i<=7;i++) arr.push(addDays(d,i));
+    return arr;
+  }, []);
   const todayStr = fmtDate(new Date());
-  const maxStr = fmtDate(addDays(new Date(),7));
+  const maxStr = fmtDate(weekDates[weekDates.length-1]);
+
+  const [selDay, setSelDay] = useState(todayStr);
+
   const upcoming = myReservations
     .filter(r=> r.date >= todayStr && r.date <= maxStr)
     .sort((a,b)=> a.date===b.date ? toMin(a.start)-toMin(b.start) : (a.date<b.date?-1:1));
 
-  function fmtResDate(ds){
-    const d = new Date(ds+'T00:00:00');
-    return (ds===todayStr?'오늘 · ':'') + (d.getMonth()+1)+'월 '+d.getDate()+'일('+DOW[d.getDay()]+')';
-  }
+  const todaysReservations = upcoming.filter(r=>r.date===todayStr).sort((a,b)=>toMin(a.start)-toMin(b.start));
+  const selDayReservations = upcoming.filter(r=>r.date===selDay).sort((a,b)=>toMin(a.start)-toMin(b.start));
+  const reservedDates = new Set(upcoming.map(r=>r.date));
 
   return (
     <div className="screen">
@@ -697,6 +709,20 @@ function HomeTab({ student, notices }){
         <div className="hero-eyebrow">WELCOME</div>
         <div className="hero-name">{student.name}님, 안녕하세요 🥁</div>
         <div className="hero-sub">{student.type === 'exam' ? '입시생' : '취미생'} 과정으로 등록되어 있어요.</div>
+      </div>
+
+      <div className="card today-highlight">
+        <div className="card-title">🔥 오늘 연습실 예약</div>
+        {todaysReservations.length === 0 ? (
+          <p style={{fontSize:13,color:'var(--text-muted)',margin:0}}>오늘 예약된 연습실이 없어요.</p>
+        ) : todaysReservations.map(r=>(
+          <div className="res-row" key={r.id}>
+            <div style={{display:'flex',alignItems:'center'}}>
+              <div className="room-badge">{roomLabel(r.room)}</div>
+              <div className="res-time">{r.start} – {r.end}</div>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="card">
@@ -718,20 +744,30 @@ function HomeTab({ student, notices }){
       </div>
 
       <div className="card">
-        <div className="card-title">🥁 내 연습실 예약</div>
-        {upcoming.length === 0 ? (
+        <div className="card-title">🥁 이번주 내 연습실 예약</div>
+        <div className="date-scroll" style={{marginBottom:14}}>
+          {weekDates.map(d=>{
+            const ds = fmtDate(d);
+            const isToday = ds === todayStr;
+            return (
+              <div key={ds} className={"date-chip"+(ds===selDay?' active':'')+(isToday?' today':'')} onClick={()=>setSelDay(ds)}>
+                <div className="dow">{DOW[d.getDay()]}</div>
+                <div className="num">{d.getDate()}</div>
+                {reservedDates.has(ds) && <div className={"res-dot"+(ds===selDay?' on-active':'')}/>}
+              </div>
+            );
+          })}
+        </div>
+        {selDayReservations.length === 0 ? (
           <div className="empty-state">
             <div className="icon">🎫</div>
-            <p>예정된 연습실 예약이 없어요.<br/>예약 탭에서 연습실을 예약해보세요.</p>
+            <p>이 날 예정된 연습실 예약이 없어요.</p>
           </div>
-        ) : upcoming.map(r=>(
+        ) : selDayReservations.map(r=>(
           <div className="res-row" key={r.id}>
             <div style={{display:'flex',alignItems:'center'}}>
               <div className="room-badge">{roomLabel(r.room)}</div>
-              <div>
-                <div className="res-time">{r.start} – {r.end}</div>
-                <div className="res-sub">{fmtResDate(r.date)}</div>
-              </div>
+              <div className="res-time">{r.start} – {r.end}</div>
             </div>
           </div>
         ))}
@@ -935,7 +971,10 @@ function ReserveTab({ student, blocks }){
                     const st = slotState(selRoom, t);
                     return (
                       <div key={t} className={"slot-cell "+st} onClick={()=>toggleSlot(selRoom, t)}>
-                        {st!=='blocked' && st!=='closed' && t}
+                        <span className="cell-time">{t}</span>
+                        {st==='other' && <span className="cell-tag">✕ 마감</span>}
+                        {st==='closed' && <span className="cell-tag">🔒 차단</span>}
+                        {st==='blocked' && <span className="cell-tag">🚫 불가</span>}
                       </div>
                     );
                   })}
@@ -944,7 +983,7 @@ function ReserveTab({ student, blocks }){
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--surface-2)',border:'1px solid rgba(201,162,39,0.3)'}}/>선택 가능</div>
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--brass)'}}/>선택됨</div>
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--brass-soft)',border:'1px solid var(--brass)'}}/>내 예약</div>
-                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--rec-soft)',border:'1px solid var(--rec)'}}/>예약됨</div>
+                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--rec-soft)',border:'1px solid var(--rec)'}}/>예약마감</div>
                   <div className="legend-item">🚫 규칙상 불가</div>
                   <div className="legend-item">🔒 예약 불가(관리자 차단)</div>
                 </div>
@@ -1137,14 +1176,16 @@ function StatusTab({ blocks }){
             {loading ? <div className="loading-spin"/> : (
               <React.Fragment>
                 <div className={"status-badge "+(currentStat.isFull?'full':'open')}>
-                  {currentStat.isFull ? '오늘 예약 마감' : `${currentStat.total-currentStat.takenCount}칸 예약 가능`}
+                  {currentStat.isFull ? '오늘 예약 마감' : `${currentStat.total-currentStat.takenCount}칸 비어있음`}
                 </div>
                 <div className="slot-grid" style={{marginTop:14}}>
                   {slots.map(t=>{
                     const st = slotStatus(selRoom, t);
                     return (
                       <div key={t} className={"slot-cell "+st}>
-                        {st==='free' ? t : (st==='closed' ? '' : '')}
+                        <span className="cell-time">{t}</span>
+                        {st==='other' && <span className="cell-tag">✕ 마감</span>}
+                        {st==='closed' && <span className="cell-tag">🔒 차단</span>}
                       </div>
                     );
                   })}
@@ -1200,7 +1241,9 @@ function MyTab({ student, notices, onLogout }){
    STUDENT SHELL
    ============================================================ */
 function StudentShell({ student, onLogout }){
-  const [tab, setTab] = useState('home');
+  const [tab, setTab] = useState(()=> localStorage.getItem('juniper_student_tab') || 'home');
+
+  useEffect(()=>{ localStorage.setItem('juniper_student_tab', tab); }, [tab]);
   const [notices, setNotices] = useState([]);
   const [blocks, setBlocks] = useState([]);
   const [liveStudent, setLiveStudent] = useState(student);
@@ -1290,24 +1333,35 @@ function AdminStudentsTab(){
 }
 
 function StudentEditModal({ student, onClose }){
-  const [type, setType] = useState(student.type);
+  const [type, setTypeState] = useState(student.type);
   const [schedule, setSchedule] = useState(student.schedule || []);
   const [newDay, setNewDay] = useState('월');
   const [newStart, setNewStart] = useState('16:00');
   const [newEnd, setNewEnd] = useState('17:00');
   const [saving, setSaving] = useState(false);
 
-  function addSchedule(){
-    setSchedule([...schedule, { day:newDay, start:newStart, end:newEnd }]);
-  }
-  function removeSchedule(i){
-    setSchedule(schedule.filter((_,idx)=>idx!==i));
-  }
-  async function save(){
+  async function chooseType(t){
+    setTypeState(t);
     setSaving(true);
-    await db.collection(COL_STUDENTS).doc(student.id).update({ type, schedule });
+    try{ await db.collection(COL_STUDENTS).doc(student.id).update({ type: t }); }
+    catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
     setSaving(false);
-    onClose();
+  }
+  async function addSchedule(){
+    const next = [...schedule, { day:newDay, start:newStart, end:newEnd }];
+    setSchedule(next);
+    setSaving(true);
+    try{ await db.collection(COL_STUDENTS).doc(student.id).update({ schedule: next }); }
+    catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
+    setSaving(false);
+  }
+  async function removeSchedule(i){
+    const next = schedule.filter((_,idx)=>idx!==i);
+    setSchedule(next);
+    setSaving(true);
+    try{ await db.collection(COL_STUDENTS).doc(student.id).update({ schedule: next }); }
+    catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
+    setSaving(false);
   }
   async function del(){
     if(!window.confirm(student.name+' 학생을 삭제할까요? 예약 내역은 삭제되지 않아요.')) return;
@@ -1323,11 +1377,12 @@ function StudentEditModal({ student, onClose }){
           <div className="modal-title">{student.name}</div>
           <div className="icon-btn" onClick={onClose}>✕</div>
         </div>
+        <p style={{fontSize:11.5,color:'var(--text-faint)',marginTop:-8,marginBottom:16}}>{saving ? '저장 중...' : '변경사항은 바로 저장돼요.'}</p>
 
         <div className="input-label">수강 유형</div>
         <div className="toggle-row" style={{marginBottom:18}}>
-          <div className={"toggle-opt"+(type==='hobby'?' active':'')} onClick={()=>setType('hobby')}>취미생</div>
-          <div className={"toggle-opt"+(type==='exam'?' active':'')} onClick={()=>setType('exam')}>입시생</div>
+          <div className={"toggle-opt"+(type==='hobby'?' active':'')} onClick={()=>chooseType('hobby')}>취미생</div>
+          <div className={"toggle-opt"+(type==='exam'?' active':'')} onClick={()=>chooseType('exam')}>입시생</div>
         </div>
 
         <div className="input-label">수업시간표</div>
@@ -1348,7 +1403,6 @@ function StudentEditModal({ student, onClose }){
         </div>
         <button className="btn btn-ghost btn-sm" style={{width:'100%',marginBottom:20}} onClick={addSchedule}>+ 수업시간 추가</button>
 
-        <button className="btn" disabled={saving} onClick={save} style={{marginBottom:10}}>{saving?'저장 중...':'저장하기'}</button>
         <button className="btn btn-danger" onClick={del}>학생 삭제</button>
       </div>
     </div>
@@ -1472,9 +1526,12 @@ function ReservationEditModal({ reservation, onClose }){
 /* ============================================================
    ADMIN: BLOCKS TAB (특정 방·시간 지속 차단)
    ============================================================ */
+const BLOCK_HOURS = (()=>{ const arr=[]; for(let h=13; h<=22; h++) arr.push(pad(h)+':00'); return arr; })();
+
 function AdminBlocksTab(){
   const [blocks, setBlocks] = useState([]);
-  const [editing, setEditing] = useState(null); // 'new' | block | null
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState(null); // 기존 차단 1건 수정
 
   useEffect(()=>{
     const unsub = db.collection(COL_BLOCKS).onSnapshot(snap=>{
@@ -1487,8 +1544,8 @@ function AdminBlocksTab(){
     <div className="screen">
       <div className="eyebrow">ADMIN</div>
       <h1 className="page-title">예약 차단 관리</h1>
-      <p className="page-sub">매주 특정 요일·시간대에 특정 방을 예약할 수 없도록 지속적으로 막아둘 수 있어요. (예: 매주 화요일 2번방 점검)</p>
-      <button className="btn" style={{marginBottom:18}} onClick={()=>setEditing('new')}>+ 새 차단 추가</button>
+      <p className="page-sub">매주 특정 요일·시간대에 특정 방을 예약할 수 없도록 지속적으로 막아둘 수 있어요. (예: 매주 금요일 1~3시, 5~7시에 2번방 차단)</p>
+      <button className="btn" style={{marginBottom:18}} onClick={()=>setAdding(true)}>+ 새 차단 추가</button>
       {blocks.length===0 ? (
         <div className="empty-state"><div className="icon">🔓</div><p>등록된 차단이 없어요.</p></div>
       ) : blocks.map(b=>(
@@ -1500,27 +1557,118 @@ function AdminBlocksTab(){
           <span className="chev">›</span>
         </div>
       ))}
-      {editing && <BlockEditModal block={editing==='new'?null:editing} onClose={()=>setEditing(null)} />}
+      {adding && <BlockAddModal onClose={()=>setAdding(false)} />}
+      {editing && <BlockEditModal block={editing} onClose={()=>setEditing(null)} />}
+    </div>
+  );
+}
+
+function BlockAddModal({ onClose }){
+  const [day, setDay] = useState('월');
+  const [room, setRoom] = useState(1);
+  const [start, setStart] = useState('13:00');
+  const [end, setEnd] = useState('14:00');
+  const [note, setNote] = useState('');
+  const [pending, setPending] = useState([]); // 아직 저장 안 된, 추가할 차단 목록
+  const [saving, setSaving] = useState(false);
+
+  function addRange(){
+    if(toMin(end) <= toMin(start)){ alert('종료 시간이 시작 시간보다 늦어야 해요.'); return; }
+    setPending([...pending, { day, room, start, end, note }]);
+  }
+  function removePending(i){
+    setPending(pending.filter((_,idx)=>idx!==i));
+  }
+  async function saveAll(){
+    if(pending.length===0) return;
+    setSaving(true);
+    try{
+      const batch = db.batch();
+      pending.forEach(p=>{
+        const ref = db.collection(COL_BLOCKS).doc();
+        batch.set(ref, { day:p.day, room:Number(p.room), start:p.start, end:p.end, note:p.note, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      });
+      await batch.commit();
+      onClose();
+    }catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
+    setSaving(false);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div className="modal-close-row">
+          <div className="modal-title">새 차단 추가</div>
+          <div className="icon-btn" onClick={onClose}>✕</div>
+        </div>
+        <p style={{fontSize:12,color:'var(--text-muted)',marginTop:0,marginBottom:16,lineHeight:1.6}}>요일·방·시간을 고르고 "추가"를 눌러 여러 개를 한 번에 등록할 수 있어요.</p>
+
+        <div className="input-label">요일 (매주 반복)</div>
+        <div className="day-pill-row">
+          {['월','화','수','목','금','토','일'].map(d=>(
+            <div key={d} className={"day-pill"+(day===d?' active':'')} onClick={()=>setDay(d)}>{d}</div>
+          ))}
+        </div>
+
+        <div className="input-label" style={{marginTop:14}}>방</div>
+        <select className="input" value={room} onChange={e=>setRoom(Number(e.target.value))} style={{marginBottom:14}}>
+          {ROOMS.map(r=><option key={r} value={r}>{roomFullLabel(r)}</option>)}
+        </select>
+
+        <div className="input-label">시간 (1시간 단위)</div>
+        <div className="mini-add-row">
+          <select className="input" value={start} onChange={e=>setStart(e.target.value)}>
+            {BLOCK_HOURS.slice(0,-1).map(h=><option key={h} value={h}>{h}</option>)}
+          </select>
+          <select className="input" value={end} onChange={e=>setEnd(e.target.value)}>
+            {BLOCK_HOURS.slice(1).map(h=><option key={h} value={h}>{h}</option>)}
+          </select>
+        </div>
+
+        <div className="input-group" style={{marginTop:14}}>
+          <label className="input-label">메모 (선택)</label>
+          <input className="input" placeholder="예: 정기 점검" value={note} onChange={e=>setNote(e.target.value)} />
+        </div>
+
+        <button className="btn btn-ghost btn-sm" style={{width:'100%',marginTop:6,marginBottom:pending.length?16:0}} onClick={addRange}>+ 추가</button>
+
+        {pending.length>0 && (
+          <React.Fragment>
+            <div className="input-label">추가할 차단 목록 ({pending.length}건)</div>
+            {pending.map((p,i)=>(
+              <div className="mini-add-row" key={i}>
+                <div className="input" style={{flex:1,textAlign:'left'}}>매주 {p.day}요일 · {roomLabel(p.room)} · {p.start}–{p.end}</div>
+                <div className="remove-chip" onClick={()=>removePending(i)}>✕</div>
+              </div>
+            ))}
+          </React.Fragment>
+        )}
+
+        <button className="btn" disabled={saving || pending.length===0} onClick={saveAll} style={{marginTop:18}}>
+          {saving ? '저장 중...' : (pending.length>0 ? `차단 ${pending.length}건 저장하기` : '차단할 시간을 추가해주세요')}
+        </button>
+      </div>
     </div>
   );
 }
 
 function BlockEditModal({ block, onClose }){
-  const [day, setDay] = useState(block?.day || '월');
-  const [room, setRoom] = useState(block?.room || 1);
-  const [start, setStart] = useState(block?.start || '13:00');
-  const [end, setEnd] = useState(block?.end || '14:00');
-  const [note, setNote] = useState(block?.note || '');
+  const [day, setDay] = useState(block.day);
+  const [room, setRoom] = useState(block.room);
+  const [start, setStart] = useState(block.start);
+  const [end, setEnd] = useState(block.end);
+  const [note, setNote] = useState(block.note || '');
   const [saving, setSaving] = useState(false);
 
   async function save(){
     if(toMin(end) <= toMin(start)){ alert('종료 시간이 시작 시간보다 늦어야 해요.'); return; }
     setSaving(true);
-    const data = { day, room: Number(room), start, end, note };
-    if(block) await db.collection(COL_BLOCKS).doc(block.id).update(data);
-    else await db.collection(COL_BLOCKS).add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    try{
+      await db.collection(COL_BLOCKS).doc(block.id).update({ day, room:Number(room), start, end, note });
+      onClose();
+    }catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
     setSaving(false);
-    onClose();
   }
   async function del(){
     if(!window.confirm('이 차단을 삭제할까요?')) return;
@@ -1533,7 +1681,7 @@ function BlockEditModal({ block, onClose }){
       <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
         <div className="modal-handle"/>
         <div className="modal-close-row">
-          <div className="modal-title">{block ? '차단 수정' : '새 차단 추가'}</div>
+          <div className="modal-title">차단 수정</div>
           <div className="icon-btn" onClick={onClose}>✕</div>
         </div>
 
@@ -1549,10 +1697,14 @@ function BlockEditModal({ block, onClose }){
           {ROOMS.map(r=><option key={r} value={r}>{roomFullLabel(r)}</option>)}
         </select>
 
-        <div className="input-label">시간</div>
+        <div className="input-label">시간 (1시간 단위)</div>
         <div className="mini-add-row">
-          <input className="input" type="time" value={start} onChange={e=>setStart(e.target.value)} />
-          <input className="input" type="time" value={end} onChange={e=>setEnd(e.target.value)} />
+          <select className="input" value={start} onChange={e=>setStart(e.target.value)}>
+            {BLOCK_HOURS.slice(0,-1).map(h=><option key={h} value={h}>{h}</option>)}
+          </select>
+          <select className="input" value={end} onChange={e=>setEnd(e.target.value)}>
+            {BLOCK_HOURS.slice(1).map(h=><option key={h} value={h}>{h}</option>)}
+          </select>
         </div>
 
         <div className="input-group" style={{marginTop:14}}>
@@ -1560,8 +1712,8 @@ function BlockEditModal({ block, onClose }){
           <input className="input" placeholder="예: 정기 점검" value={note} onChange={e=>setNote(e.target.value)} />
         </div>
 
-        <button className="btn" disabled={saving} onClick={save} style={{marginTop:6,marginBottom:block?10:0}}>{saving?'저장 중...':'저장하기'}</button>
-        {block && <button className="btn btn-danger" onClick={del}>차단 삭제</button>}
+        <button className="btn" disabled={saving} onClick={save} style={{marginTop:6,marginBottom:10}}>{saving?'저장 중...':'저장하기'}</button>
+        <button className="btn btn-danger" onClick={del}>차단 삭제</button>
       </div>
     </div>
   );
@@ -1653,7 +1805,9 @@ function NoticeEditModal({ notice, onClose }){
    ADMIN SHELL
    ============================================================ */
 function AdminShell({ onLogout }){
-  const [tab, setTab] = useState('students');
+  const [tab, setTab] = useState(()=> localStorage.getItem('juniper_admin_tab') || 'students');
+
+  useEffect(()=>{ localStorage.setItem('juniper_admin_tab', tab); }, [tab]);
   const tabs = [
     { key:'students', label:'학생', icon:<Icon.user/> },
     { key:'reservations', label:'예약', icon:<Icon.cal/> },
@@ -1761,6 +1915,8 @@ function App(){
 
   function logout(){
     localStorage.removeItem('juniper_session');
+    localStorage.removeItem('juniper_student_tab');
+    localStorage.removeItem('juniper_admin_tab');
     setSession(null);
     setView('login');
   }
