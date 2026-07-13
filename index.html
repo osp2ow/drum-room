@@ -1125,8 +1125,9 @@ function NoticeList({ notices }){
 /* ============================================================
    STUDENT: STATUS TAB (오늘의 방별 예약 현황)
    ============================================================ */
-function StatusTab({ blocks }){
-  const [selRoom, setSelRoom] = useState(1);
+function StatusTab({ student, blocks }){
+  const availableRooms = useMemo(()=> getAvailableRooms(student.type), [student.type]);
+  const [selRoom, setSelRoom] = useState(availableRooms[0]);
   const [dayReservations, setDayReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const todayStr = fmtDate(new Date());
@@ -1134,6 +1135,10 @@ function StatusTab({ blocks }){
   const hours = useMemo(()=> getOperatingHours(dateObj), [dateObj]);
   const slots = useMemo(()=> generateHalfHourSlots(hours), [hours]);
   const todayDow = DOW[dateObj.getDay()];
+
+  useEffect(()=>{
+    if(!availableRooms.includes(selRoom)) setSelRoom(availableRooms[0]);
+  }, [availableRooms]);
 
   useEffect(()=>{
     setLoading(true);
@@ -1153,7 +1158,7 @@ function StatusTab({ blocks }){
     return 'free';
   }
 
-  const roomStats = ROOMS.map(r=>{
+  const roomStats = availableRooms.map(r=>{
     const total = slots.length;
     const takenCount = slots.filter(t=>slotStatus(r,t)!=='free').length;
     return { room:r, total, takenCount, isFull: total>0 && takenCount>=total };
@@ -1171,7 +1176,7 @@ function StatusTab({ blocks }){
       ) : (
         <React.Fragment>
           <div className="room-tabs">
-            {ROOMS.map(r=>(
+            {availableRooms.map(r=>(
               <div key={r} className={"room-tab"+(selRoom===r?' active':'')} onClick={()=>setSelRoom(r)}>
                 <div className="rn">ROOM</div>
                 <div className="rt">{roomLabel(r)}</div>
@@ -1297,7 +1302,7 @@ function StudentShell({ student, onLogout }){
       <AppHeader right={<span>{liveStudent.type==='exam'?'입시생':'취미생'}</span>} />
       {tab==='home' && <HomeTab student={liveStudent} notices={notices} />}
       {tab==='reserve' && <ReserveTab student={liveStudent} blocks={blocks} />}
-      {tab==='status' && <StatusTab blocks={blocks} />}
+      {tab==='status' && <StatusTab student={liveStudent} blocks={blocks} />}
       {tab==='my' && <MyTab student={liveStudent} notices={notices} onLogout={onLogout} />}
       <TabBar tabs={tabs} active={tab} onChange={setTab} />
     </React.Fragment>
