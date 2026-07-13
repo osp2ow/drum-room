@@ -238,9 +238,11 @@
   }
   .slot-cell .cell-time{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;}
   .slot-cell .cell-tag{font-size:9.5px;font-weight:800;letter-spacing:0.01em;}
+  .slot-cell .cell-x{font-size:28px;font-weight:800;line-height:1;color:var(--text-faint);}
+  .slot-cell .cell-time-sub{font-size:9.5px;color:var(--text-faint);font-weight:600;}
   .slot-cell.free{border-color:rgba(47,191,175,0.35);cursor:pointer;}
   .slot-cell.mine{background:var(--brass-soft);border-color:var(--brass);color:var(--brass-bright);}
-  .slot-cell.other{background:var(--rec-soft);border-color:rgba(255,90,95,0.3);color:#C7383C;}
+  .slot-cell.other{background:var(--surface-3);border-color:var(--border);}
   .slot-cell.selected{background:var(--brass);border-color:var(--brass);color:#FFFFFF;font-weight:800;cursor:pointer;box-shadow:0 3px 8px rgba(47,191,175,0.35);}
   .slot-cell.blocked{opacity:0.4;}
   .slot-cell.closed{background:var(--surface-3);border-color:var(--border);color:var(--text-faint);}
@@ -971,10 +973,18 @@ function ReserveTab({ student, blocks }){
                     const st = slotState(selRoom, t);
                     return (
                       <div key={t} className={"slot-cell "+st} onClick={()=>toggleSlot(selRoom, t)}>
-                        <span className="cell-time">{t}</span>
-                        {st==='other' && <span className="cell-tag">✕ 마감</span>}
-                        {st==='closed' && <span className="cell-tag">🔒 차단</span>}
-                        {st==='blocked' && <span className="cell-tag">🚫 불가</span>}
+                        {st==='other' ? (
+                          <React.Fragment>
+                            <span className="cell-x">✕</span>
+                            <span className="cell-time-sub">{t}</span>
+                          </React.Fragment>
+                        ) : (
+                          <React.Fragment>
+                            <span className="cell-time">{t}</span>
+                            {st==='closed' && <span className="cell-tag">🔒 차단</span>}
+                            {st==='blocked' && <span className="cell-tag">🚫 불가</span>}
+                          </React.Fragment>
+                        )}
                       </div>
                     );
                   })}
@@ -983,7 +993,7 @@ function ReserveTab({ student, blocks }){
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--surface-2)',border:'1px solid rgba(201,162,39,0.3)'}}/>선택 가능</div>
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--brass)'}}/>선택됨</div>
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--brass-soft)',border:'1px solid var(--brass)'}}/>내 예약</div>
-                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--rec-soft)',border:'1px solid var(--rec)'}}/>예약마감</div>
+                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--surface-3)',border:'1px solid var(--border)'}}/>예약마감</div>
                   <div className="legend-item">🚫 규칙상 불가</div>
                   <div className="legend-item">🔒 예약 불가(관리자 차단)</div>
                 </div>
@@ -1183,16 +1193,24 @@ function StatusTab({ blocks }){
                     const st = slotStatus(selRoom, t);
                     return (
                       <div key={t} className={"slot-cell "+st}>
-                        <span className="cell-time">{t}</span>
-                        {st==='other' && <span className="cell-tag">✕ 마감</span>}
-                        {st==='closed' && <span className="cell-tag">🔒 차단</span>}
+                        {st==='other' ? (
+                          <React.Fragment>
+                            <span className="cell-x">✕</span>
+                            <span className="cell-time-sub">{t}</span>
+                          </React.Fragment>
+                        ) : (
+                          <React.Fragment>
+                            <span className="cell-time">{t}</span>
+                            {st==='closed' && <span className="cell-tag">🔒 차단</span>}
+                          </React.Fragment>
+                        )}
                       </div>
                     );
                   })}
                 </div>
                 <div className="legend" style={{marginTop:14}}>
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--surface-2)',border:'1px solid rgba(47,191,175,0.35)'}}/>예약 비어있음</div>
-                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--rec-soft)',border:'1px solid var(--rec)'}}/>예약 마감</div>
+                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--surface-3)',border:'1px solid var(--border)'}}/>예약 마감</div>
                   <div className="legend-item">🔒 이용불가</div>
                 </div>
               </React.Fragment>
@@ -1339,27 +1357,36 @@ function StudentEditModal({ student, onClose }){
   const [newStart, setNewStart] = useState('16:00');
   const [newEnd, setNewEnd] = useState('17:00');
   const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState('');
+
+  function flashSaved(msg){
+    setJustSaved(msg);
+    setTimeout(()=> setJustSaved(''), 2200);
+  }
 
   async function chooseType(t){
     setTypeState(t);
     setSaving(true);
-    try{ await db.collection(COL_STUDENTS).doc(student.id).update({ type: t }); }
+    try{ await db.collection(COL_STUDENTS).doc(student.id).update({ type: t }); flashSaved('✓ 수강 유형이 저장됐어요.'); }
     catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
     setSaving(false);
   }
   async function addSchedule(){
+    if(toMin(newEnd) <= toMin(newStart)){ alert('종료 시간이 시작 시간보다 늦어야 해요.'); return; }
     const next = [...schedule, { day:newDay, start:newStart, end:newEnd }];
-    setSchedule(next);
     setSaving(true);
-    try{ await db.collection(COL_STUDENTS).doc(student.id).update({ schedule: next }); }
+    try{
+      await db.collection(COL_STUDENTS).doc(student.id).update({ schedule: next });
+      setSchedule(next);
+      flashSaved(`✓ ${newDay}요일 ${newStart}–${newEnd} 수업이 저장됐어요.`);
+    }
     catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
     setSaving(false);
   }
   async function removeSchedule(i){
     const next = schedule.filter((_,idx)=>idx!==i);
-    setSchedule(next);
     setSaving(true);
-    try{ await db.collection(COL_STUDENTS).doc(student.id).update({ schedule: next }); }
+    try{ await db.collection(COL_STUDENTS).doc(student.id).update({ schedule: next }); setSchedule(next); flashSaved('✓ 수업시간이 삭제됐어요.'); }
     catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
     setSaving(false);
   }
@@ -1377,7 +1404,11 @@ function StudentEditModal({ student, onClose }){
           <div className="modal-title">{student.name}</div>
           <div className="icon-btn" onClick={onClose}>✕</div>
         </div>
-        <p style={{fontSize:11.5,color:'var(--text-faint)',marginTop:-8,marginBottom:16}}>{saving ? '저장 중...' : '변경사항은 바로 저장돼요.'}</p>
+        {justSaved ? (
+          <div className="info-box" style={{marginTop:-4}}>{justSaved}</div>
+        ) : (
+          <p style={{fontSize:11.5,color:'var(--text-faint)',marginTop:-8,marginBottom:16}}>{saving ? '저장 중...' : '아래 버튼을 눌러야 저장돼요.'}</p>
+        )}
 
         <div className="input-label">수강 유형</div>
         <div className="toggle-row" style={{marginBottom:18}}>
@@ -1385,8 +1416,10 @@ function StudentEditModal({ student, onClose }){
           <div className={"toggle-opt"+(type==='exam'?' active':'')} onClick={()=>chooseType('exam')}>입시생</div>
         </div>
 
-        <div className="input-label">수업시간표</div>
-        {schedule.map((s,i)=>(
+        <div className="input-label">등록된 수업시간</div>
+        {schedule.length === 0 ? (
+          <p style={{fontSize:12.5,color:'var(--text-faint)',margin:'2px 0 12px'}}>아직 등록된 수업시간이 없어요. 아래에서 추가해주세요.</p>
+        ) : schedule.map((s,i)=>(
           <div className="mini-add-row" key={i}>
             <div className="input" style={{flex:'0 0 44px',textAlign:'center'}}>{s.day}</div>
             <div className="input" style={{flex:1,textAlign:'center'}}>{s.start} – {s.end}</div>
@@ -1394,14 +1427,15 @@ function StudentEditModal({ student, onClose }){
           </div>
         ))}
 
-        <div className="mini-add-row" style={{marginTop:10}}>
+        <div className="input-label" style={{marginTop:14}}>새 수업시간 등록</div>
+        <div className="mini-add-row" style={{marginTop:6}}>
           <select className="input" style={{flex:'0 0 66px'}} value={newDay} onChange={e=>setNewDay(e.target.value)}>
             {['월','화','수','목','금','토','일'].map(d=><option key={d} value={d}>{d}</option>)}
           </select>
           <input className="input" type="time" value={newStart} onChange={e=>setNewStart(e.target.value)} />
           <input className="input" type="time" value={newEnd} onChange={e=>setNewEnd(e.target.value)} />
         </div>
-        <button className="btn btn-ghost btn-sm" style={{width:'100%',marginBottom:20}} onClick={addSchedule}>+ 수업시간 추가</button>
+        <button className="btn" disabled={saving} style={{marginTop:10,marginBottom:20}} onClick={addSchedule}>{saving ? '저장 중...' : `${newDay}요일 ${newStart}–${newEnd} 저장하기`}</button>
 
         <button className="btn btn-danger" onClick={del}>학생 삭제</button>
       </div>
