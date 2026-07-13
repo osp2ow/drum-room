@@ -301,6 +301,7 @@
     font-family:var(--font-body);font-size:13.5px;font-weight:800;color:var(--brass-bright);background:var(--brass-soft);
     padding:6px 11px;border-radius:9px;margin-right:10px;flex-shrink:0;
   }
+  .res-row .res-date{font-family:var(--font-body);font-size:12.5px;font-weight:700;color:var(--text-muted);margin-bottom:2px;}
   .res-row .res-time{font-family:var(--font-mono);font-size:13.5px;font-weight:700;}
   .res-row .res-sub{font-size:11px;color:var(--text-faint);margin-top:2px;}
   .res-row .cancel-x{color:var(--text-faint);font-size:18px;cursor:pointer;padding:4px 8px;}
@@ -493,8 +494,9 @@ function groupRuns(slots){
 }
 
 // 특정 학생의 하루 예약 규칙: 취미생 1일 1시간(2칸) / 입시생 1일 3시간(6칸), 한 방에서 연속 최대 2시간(4칸)
-// 4칸을 연속으로 쓴 뒤엔 같은 방은 최소 30분(1칸) 휴식 후에만 추가 선택 가능, 다른 방은 아무 시간에나 선택 가능 (총 한도 내에서)
+// 4칸을 연속으로 쓴 뒤엔 같은 방은 최소 1시간(2칸) 휴식 후에만 추가 선택 가능, 다른 방은 아무 시간에나 선택 가능 (총 한도 내에서)
 function dailyLimitSlots(type){ return type === 'exam' ? 6 : 2; }
+const MIN_REST_SLOTS = 2; // 같은 방을 다시 쓰려면 최소 1시간(2칸) 휴식 필요
 
 function canAddSlot(type, existingMySlots, room, time){
   const combined = existingMySlots.concat([{ room, time }]);
@@ -505,7 +507,10 @@ function canAddSlot(type, existingMySlots, room, time){
   let runLen = 1, i = idx, j = idx;
   while(i > 0 && times[i]-times[i-1] === 30){ runLen++; i--; }
   while(j < times.length-1 && times[j+1]-times[j] === 30){ runLen++; j++; }
-  return runLen <= 4;
+  if(runLen > 4) return false;
+  if(i > 0 && (times[i]-times[i-1]) < MIN_REST_SLOTS*30) return false;
+  if(j < times.length-1 && (times[j+1]-times[j]) < MIN_REST_SLOTS*30) return false;
+  return true;
 }
 
 /* ============================================================
@@ -741,7 +746,10 @@ function HomeTab({ student, notices }){
           <div className="res-row" key={r.id}>
             <div style={{display:'flex',alignItems:'center'}}>
               <div className="room-badge">{roomFullLabel(r.room)}</div>
-              <div className="res-time">{r.start} – {r.end}</div>
+              <div>
+                <div className="res-date">{fmtKDate(new Date(r.date+'T00:00:00'))}</div>
+                <div className="res-time">{r.start} – {r.end}</div>
+              </div>
             </div>
           </div>
         ))}
@@ -789,7 +797,10 @@ function HomeTab({ student, notices }){
           <div className="res-row" key={r.id}>
             <div style={{display:'flex',alignItems:'center'}}>
               <div className="room-badge">{roomFullLabel(r.room)}</div>
-              <div className="res-time">{r.start} – {r.end}</div>
+              <div>
+                <div className="res-date">{fmtKDate(new Date(r.date+'T00:00:00'))}</div>
+                <div className="res-time">{r.start} – {r.end}</div>
+              </div>
             </div>
           </div>
         ))}
@@ -937,7 +948,7 @@ function ReserveTab({ student, blocks }){
     <div className="screen">
       <div className="eyebrow">PRACTICE ROOM</div>
       <h1 className="page-title">연습실 예약</h1>
-      <p className="page-sub">{student.type==='exam' ? '입시생: 1일 최대 3시간(6칸). 한 방에서 최대 2시간(4칸) 연속 사용 후엔 같은 방은 30분 휴식, 다른 방은 언제든 이용 가능해요.' : '취미생: 1일 최대 1시간(2칸)'}</p>
+      <p className="page-sub">{student.type==='exam' ? '입시생: 1일 최대 3시간(6칸). 한 방에서 최대 2시간(4칸) 연속 사용 후엔 같은 방은 1시간 휴식, 다른 방은 언제든 이용 가능해요.' : '취미생: 1일 최대 1시간(2칸)'}</p>
 
       <div className="date-scroll-row">
         <div className="date-scroll">
