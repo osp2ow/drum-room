@@ -220,9 +220,12 @@
     background:var(--surface-2);display:flex;align-items:center;justify-content:center;
     font-family:var(--font-mono);font-size:8.5px;color:var(--text-faint);position:relative;
   }
-  .slot-cell.free{border-color:rgba(201,162,39,0.3);}
+  .slot-cell.free{border-color:rgba(201,162,39,0.3);cursor:pointer;}
   .slot-cell.mine{background:var(--brass-soft);border-color:var(--brass);color:var(--brass-bright);}
   .slot-cell.other{background:var(--rec-soft);border-color:rgba(225,72,60,0.35);color:#F0968D;}
+  .slot-cell.selected{background:var(--brass);border-color:var(--brass);color:#1A1608;font-weight:700;cursor:pointer;}
+  .slot-cell.blocked{opacity:0.3;}
+  .slot-cell.blocked::after{content:'🚫';position:absolute;font-size:9px;opacity:0.8;}
   .slot-cell .dot{width:4px;height:4px;border-radius:50%;background:var(--rec);position:absolute;top:4px;right:4px;}
   .legend{display:flex;gap:14px;margin-bottom:20px;flex-wrap:wrap;}
   .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);}
@@ -353,6 +356,10 @@ const COL_NOTICES = "juniper_notices";
    ============================================================ */
 const DOW = ['일','월','화','수','목','금','토'];
 const ROOMS = [1,2,3,4];
+const ROOM_LABELS = { 1:'1번', 2:'2번', 3:'3번', 4:'버스킹드럼' };
+function roomLabel(r){ return ROOM_LABELS[Number(r)] || (r+'번'); }
+function roomFullLabel(r){ return Number(r)===4 ? roomLabel(r) : roomLabel(r)+'방'; }
+function getAvailableRooms(type){ return type === 'exam' ? [1,2,3,4] : [1,2,3]; }
 
 function pad(n){ return n < 10 ? '0'+n : ''+n; }
 function fmtDate(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
@@ -382,39 +389,47 @@ function hasOverlap(reservations, room, start, end){
   return reservations.some(r => Number(r.room) === Number(room) && toMin(r.start) < e && s < toMin(r.end));
 }
 
-// 예약 규칙 검증: type = 'hobby' | 'exam'
-function validateReservation(type, existingTodayForStudent, room, start, end){
-  const s = toMin(start), e = toMin(end), dur = e - s;
-  const dailyLimit = type === 'exam' ? 180 : 60;
-  const usedMin = existingTodayForStudent.reduce((sum,r)=> sum + (toMin(r.end)-toMin(r.start)), 0);
+// 예약을 30분 단위 슬롯 리스트로 펼치기: [{room, time}, ...]
+function expandToSlots(resList){
+  const list = [];
+  resList.forEach(r=>{
+    let cur = toMin(r.start); const end = toMin(r.end);
+    while(cur < end){ list.push({ room:Number(r.room), time:toTime(cur) }); cur += 30; }
+  });
+  return list;
+}
 
-  if(usedMin + dur > dailyLimit){
-    return { ok:false, msg: `오늘 예약 가능한 시간(${dailyLimit/60}시간)을 초과해요. 남은 시간: ${Math.max(0,dailyLimit-usedMin)}분` };
-  }
+// 슬롯을 연속 구간(run)으로 묶기: [{room, start, end}, ...]
+function groupRuns(slots){
+  const byRoom = {};
+  slots.forEach(s=>{ (byRoom[s.room] = byRoom[s.room] || []).push(toMin(s.time)); });
+  const runs = [];
+  Object.keys(byRoom).forEach(room=>{
+    const times = byRoom[room].sort((a,b)=>a-b);
+    let runStart = times[0], prev = times[0];
+    for(let k=1;k<=times.length;k++){
+      if(k < times.length && times[k]-prev === 30){ prev = times[k]; continue; }
+      runs.push({ room:Number(room), start:toTime(runStart), end:toTime(prev+30) });
+      if(k < times.length){ runStart = times[k]; prev = times[k]; }
+    }
+  });
+  return runs;
+}
 
-  if(type === 'hobby'){
-    if(dur > 60) return { ok:false, msg:'취미생은 1회 최대 1시간까지 예약할 수 있어요.' };
-    return { ok:true };
-  }
+// 특정 학생의 하루 예약 규칙: 취미생 1일 1시간(2칸) / 입시생 1일 3시간(6칸), 한 방에서 연속 최대 2시간(4칸)
+// 4칸을 연속으로 쓴 뒤엔 같은 방은 최소 30분(1칸) 휴식 후에만 추가 선택 가능, 다른 방은 아무 시간에나 선택 가능 (총 한도 내에서)
+function dailyLimitSlots(type){ return type === 'exam' ? 6 : 2; }
 
-  // 입시생 규칙
-  if(dur > 120) return { ok:false, msg:'1회 예약은 최대 2시간까지 가능해요.' };
-
-  const sameRoom = existingTodayForStudent.filter(r => Number(r.room) === Number(room));
-
-  for(const r of sameRoom){
-    const rs = toMin(r.start), re = toMin(r.end);
-    if(re <= s){ const gap = s - re; if(gap > 0 && gap < 30) return { ok:false, msg:'같은 방을 이어서 쓰려면 최소 30분 휴식이 필요해요. 다른 방을 이용해보세요.' }; }
-    if(e <= rs){ const gap = rs - e; if(gap > 0 && gap < 30) return { ok:false, msg:'같은 방을 이어서 쓰려면 최소 30분 휴식이 필요해요. 다른 방을 이용해보세요.' }; }
-  }
-
-  const touching = sameRoom.filter(r => toMin(r.end) === s || toMin(r.start) === e);
-  if(touching.length){
-    const blockMin = touching.reduce((sum,r)=> sum + (toMin(r.end)-toMin(r.start)), 0) + dur;
-    if(blockMin > 120) return { ok:false, msg:'같은 방에서는 최대 2시간까지 연속 이용할 수 있어요. 30분 휴식 후 예약하거나 다른 방을 이용해주세요.' };
-  }
-
-  return { ok:true };
+function canAddSlot(type, existingMySlots, room, time){
+  const combined = existingMySlots.concat([{ room, time }]);
+  if(combined.length > dailyLimitSlots(type)) return false;
+  const times = combined.filter(s=>s.room===room).map(s=>toMin(s.time)).sort((a,b)=>a-b);
+  const target = toMin(time);
+  let idx = times.indexOf(target);
+  let runLen = 1, i = idx, j = idx;
+  while(i > 0 && times[i]-times[i-1] === 30){ runLen++; i--; }
+  while(j < times.length-1 && times[j+1]-times[j] === 30){ runLen++; j++; }
+  return runLen <= 4;
 }
 
 /* ============================================================
@@ -645,18 +660,19 @@ function HomeTab({ student, notices }){
    STUDENT: RESERVE TAB
    ============================================================ */
 function ReserveTab({ student }){
+  const availableRooms = useMemo(()=> getAvailableRooms(student.type), [student.type]);
   const [selDate, setSelDate] = useState(fmtDate(new Date()));
-  const [selRoom, setSelRoom] = useState(1);
+  const [selRoom, setSelRoom] = useState(availableRooms[0]);
   const [dayReservations, setDayReservations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selStart, setSelStart] = useState(null);
-  const [selDur, setSelDur] = useState(60);
+  const [draftSlots, setDraftSlots] = useState([]); // [{room,time}] 아직 저장 안 된 선택
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const dateObj = useMemo(()=> new Date(selDate+'T00:00:00'), [selDate]);
   const hours = useMemo(()=> getOperatingHours(dateObj), [dateObj]);
   const slots = useMemo(()=> generateHalfHourSlots(hours), [hours]);
+  const limitSlots = dailyLimitSlots(student.type);
 
   const dates = useMemo(()=>{
     const arr = [];
@@ -669,6 +685,10 @@ function ReserveTab({ student }){
   }, []);
 
   useEffect(()=>{
+    if(!availableRooms.includes(selRoom)) setSelRoom(availableRooms[0]);
+  }, [availableRooms]);
+
+  useEffect(()=>{
     setLoading(true);
     const unsub = db.collection(COL_RESERVATIONS).where('date','==',selDate)
       .onSnapshot(snap => {
@@ -678,46 +698,68 @@ function ReserveTab({ student }){
     return () => unsub();
   }, [selDate]);
 
-  useEffect(()=>{ setSelStart(null); setMsg(''); }, [selDate, selRoom]);
+  useEffect(()=>{ setDraftSlots([]); setMsg(''); }, [selDate]);
 
-  const myToday = dayReservations.filter(r => r.studentId === student.id);
-  const dailyLimit = student.type === 'exam' ? 180 : 60;
-  const usedMin = myToday.reduce((s,r)=> s + (toMin(r.end)-toMin(r.start)), 0);
-  const remainMin = Math.max(0, dailyLimit - usedMin);
+  const existingSlots = useMemo(()=> expandToSlots(dayReservations.filter(r=>r.studentId===student.id)), [dayReservations, student.id]);
+  const usedSlots = existingSlots.length + draftSlots.length;
+  const remainMin = Math.max(0, (limitSlots - usedSlots) * 30);
 
-  const roomSlotMap = {}; // time -> 'free'|'mine'|'other'
-  slots.forEach(t=>{
-    const s = toMin(t), e = s+30;
-    const mine = dayReservations.some(r => Number(r.room)===selRoom && r.studentId===student.id && toMin(r.start)<e && s<toMin(r.end));
-    const other = dayReservations.some(r => Number(r.room)===selRoom && r.studentId!==student.id && toMin(r.start)<e && s<toMin(r.end));
-    roomSlotMap[t] = mine ? 'mine' : (other ? 'other' : 'free');
-  });
-
-  function canStartAt(startTime, dur){
-    const s = toMin(startTime), e = s + dur;
-    if(!hours || e > toMin(hours.end)) return false;
-    if(hasOverlap(dayReservations, selRoom, startTime, toTime(e))) return false;
-    const check = validateReservation(student.type, myToday, selRoom, startTime, toTime(e));
-    return check.ok;
+  function slotState(room, time){
+    const s = toMin(time), e = s + 30;
+    const isOther = dayReservations.some(r => Number(r.room)===room && r.studentId!==student.id && toMin(r.start)<e && s<toMin(r.end));
+    if(isOther) return 'other';
+    if(existingSlots.some(sl=>sl.room===room && sl.time===time)) return 'mine';
+    if(draftSlots.some(sl=>sl.room===room && sl.time===time)) return 'selected';
+    const ok = canAddSlot(student.type, existingSlots.concat(draftSlots), room, time);
+    return ok ? 'free' : 'blocked';
   }
 
-  async function submitReservation(){
-    if(selStart==null) return;
+  function toggleSlot(room, time){
+    const state = slotState(room, time);
+    if(state === 'free'){
+      setDraftSlots(prev=>[...prev, { room, time }]);
+      setMsg('');
+    } else if(state === 'selected'){
+      setDraftSlots(prev=>prev.filter(sl=>!(sl.room===room && sl.time===time)));
+    }
+  }
+
+  const draftRuns = useMemo(()=> groupRuns(draftSlots), [draftSlots]);
+
+  async function submitAll(){
+    if(draftSlots.length===0) return;
     setSubmitting(true); setMsg('');
-    const end = toTime(toMin(selStart)+selDur);
     try{
       const fresh = await db.collection(COL_RESERVATIONS).where('date','==',selDate).get();
       const freshList = fresh.docs.map(d=>({id:d.id, ...d.data()}));
-      const freshMine = freshList.filter(r=>r.studentId===student.id);
-      if(hasOverlap(freshList, selRoom, selStart, end)){ setMsg('방금 다른 학생이 예약해서 시간이 겹쳐요. 다른 시간을 선택해주세요.'); setSubmitting(false); return; }
-      const check = validateReservation(student.type, freshMine, selRoom, selStart, end);
-      if(!check.ok){ setMsg(check.msg); setSubmitting(false); return; }
-      await db.collection(COL_RESERVATIONS).add({
-        studentId: student.id, studentName: student.name, studentType: student.type,
-        room: selRoom, date: selDate, start: selStart, end,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      const conflict = draftSlots.some(sl=>{
+        const s = toMin(sl.time), e = s+30;
+        return freshList.some(r=>r.studentId!==student.id && Number(r.room)===sl.room && toMin(r.start)<e && s<toMin(r.end));
       });
-      setSelStart(null);
+      if(conflict){ setMsg('방금 다른 학생이 예약해서 시간이 겹쳐요. 선택을 확인해주세요.'); setSubmitting(false); return; }
+
+      const freshExisting = expandToSlots(freshList.filter(r=>r.studentId===student.id));
+      let running = freshExisting.slice();
+      for(const sl of draftSlots){
+        if(!canAddSlot(student.type, running, sl.room, sl.time)){
+          setMsg('예약 규칙에 맞지 않는 시간이 포함되어 있어요. 선택을 다시 확인해주세요.');
+          setSubmitting(false);
+          return;
+        }
+        running.push(sl);
+      }
+
+      const batch = db.batch();
+      draftRuns.forEach(run=>{
+        const ref = db.collection(COL_RESERVATIONS).doc();
+        batch.set(ref, {
+          studentId: student.id, studentName: student.name, studentType: student.type,
+          room: run.room, date: selDate, start: run.start, end: run.end,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      await batch.commit();
+      setDraftSlots([]);
       setMsg('✅ 예약이 완료됐어요!');
     }catch(e){ setMsg('예약 중 오류가 발생했어요. 다시 시도해주세요.'); }
     setSubmitting(false);
@@ -734,7 +776,7 @@ function ReserveTab({ student }){
     <div className="screen">
       <div className="eyebrow">PRACTICE ROOM</div>
       <h1 className="page-title">연습실 예약</h1>
-      <p className="page-sub">{student.type==='exam' ? '입시생: 1일 최대 3시간 (2시간 연속 + 30분 휴식 또는 방 이동 후 1시간)' : '취미생: 1일 최대 1시간'}</p>
+      <p className="page-sub">{student.type==='exam' ? '입시생: 1일 최대 3시간(6칸). 한 방에서 최대 2시간(4칸) 연속 사용 후엔 같은 방은 30분 휴식, 다른 방은 언제든 이용 가능해요.' : '취미생: 1일 최대 1시간(2칸)'}</p>
 
       <div className="date-scroll">
         {dates.map(d=>{
@@ -751,10 +793,10 @@ function ReserveTab({ student }){
 
       <div className="budget-bar-wrap">
         <div style={{display:'flex',justifyContent:'space-between',fontSize:'12px',color:'var(--text-muted)'}}>
-          <span>오늘 남은 예약 가능 시간</span>
+          <span>오늘 남은 예약 가능 시간{draftSlots.length>0 && ' (선택 반영)'}</span>
           <span style={{fontFamily:'var(--font-mono)',color:'var(--brass-bright)',fontWeight:700}}>{Math.floor(remainMin/60)}시간 {remainMin%60}분</span>
         </div>
-        <div className="budget-bar-track"><div className="budget-bar-fill" style={{width: (100*(dailyLimit-remainMin)/dailyLimit)+'%'}}/></div>
+        <div className="budget-bar-track"><div className="budget-bar-fill" style={{width: (100*usedSlots/limitSlots)+'%'}}/></div>
       </div>
 
       {!hours ? (
@@ -762,59 +804,61 @@ function ReserveTab({ student }){
       ) : (
         <React.Fragment>
           <div className="room-tabs">
-            {ROOMS.map(r=>(
+            {availableRooms.map(r=>(
               <div key={r} className={"room-tab"+(selRoom===r?' active':'')} onClick={()=>setSelRoom(r)}>
                 <div className="rn">ROOM</div>
-                <div className="rt">{r}번</div>
+                <div className="rt">{roomLabel(r)}</div>
               </div>
             ))}
           </div>
 
           <div className="card">
-            <div className="card-title">{selRoom}번방 현황 · {fmtKDate(dateObj)}</div>
+            <div className="card-title">{roomFullLabel(selRoom)} 현황 · {fmtKDate(dateObj)}</div>
             {loading ? <div className="loading-spin"/> : (
               <React.Fragment>
                 <div className="slot-grid">
-                  {slots.map(t=>(
-                    <div key={t} className={"slot-cell "+roomSlotMap[t]}
-                      onClick={()=>{ if(roomSlotMap[t]!=='other') setSelStart(t===selStart?null:t); }}
-                      style={selStart===t ? {outline:'2px solid var(--brass-bright)'} : {}}>
-                      {t}
-                    </div>
-                  ))}
+                  {slots.map(t=>{
+                    const st = slotState(selRoom, t);
+                    return (
+                      <div key={t} className={"slot-cell "+st} onClick={()=>toggleSlot(selRoom, t)}>
+                        {st!=='blocked' && t}
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="legend">
-                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--surface-2)',border:'1px solid rgba(201,162,39,0.3)'}}/>예약 가능</div>
+                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--surface-2)',border:'1px solid rgba(201,162,39,0.3)'}}/>선택 가능</div>
+                  <div className="legend-item"><div className="legend-dot" style={{background:'var(--brass)'}}/>선택됨</div>
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--brass-soft)',border:'1px solid var(--brass)'}}/>내 예약</div>
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--rec-soft)',border:'1px solid var(--rec)'}}/>예약됨</div>
+                  <div className="legend-item">🚫 규칙상 불가</div>
                 </div>
               </React.Fragment>
             )}
+            <p style={{fontSize:11.5,color:'var(--text-faint)',marginTop:10,marginBottom:0,lineHeight:1.5}}>칸을 눌러 여러 시간을 한 번에 선택할 수 있어요. 다른 방 탭으로 이동해도 선택은 유지돼요.</p>
           </div>
 
-          <div className="card">
-            <div className="card-title">시작 시간 · {selRoom}번방</div>
-            <select className="input" value={selStart||''} onChange={e=>setSelStart(e.target.value||null)}>
-              <option value="">시작 시간을 선택하세요</option>
-              {slots.filter(t=>roomSlotMap[t]!=='other').map(t=>(
-                <option key={t} value={t} disabled={!canStartAt(t,60) && !canStartAt(t,120)}>{t}</option>
+          {draftRuns.length > 0 && (
+            <div className="card">
+              <div className="card-title">선택한 예약</div>
+              {draftRuns.map((run,i)=>(
+                <div className="res-row" key={i}>
+                  <div style={{display:'flex',alignItems:'center'}}>
+                    <div className="room-badge">{roomLabel(run.room)}</div>
+                    <div className="res-time">{run.start} – {run.end}</div>
+                  </div>
+                  <div className="cancel-x" onClick={()=>setDraftSlots(prev=>prev.filter(sl=>!(sl.room===run.room && toMin(sl.time)>=toMin(run.start) && toMin(sl.time)<toMin(run.end))))}>✕</div>
+                </div>
               ))}
-            </select>
 
-            <div className="input-label" style={{marginTop:16}}>이용 시간</div>
-            <div className="dur-row">
-              <div className={"dur-opt"+(selDur===60?' active':'')+(selStart&&!canStartAt(selStart,60)?' disabled':'')} onClick={()=>setSelDur(60)}>1시간</div>
-              {student.type==='exam' && (
-                <div className={"dur-opt"+(selDur===120?' active':'')+(selStart&&!canStartAt(selStart,120)?' disabled':'')} onClick={()=>setSelDur(120)}>2시간</div>
-              )}
+              {msg && <div className={msg.startsWith('✅')?'info-box':'error-box'} style={{marginTop:6}}>{msg}</div>}
+
+              <button className="btn" style={{marginTop:10}} disabled={submitting} onClick={submitAll}>
+                {submitting ? '예약 중...' : '선택한 시간 예약하기'}
+              </button>
             </div>
-
-            {msg && <div className={msg.startsWith('✅')?'info-box':'error-box'} style={{marginTop:16}}>{msg}</div>}
-
-            <button className="btn" style={{marginTop:16}} disabled={!selStart || submitting || !canStartAt(selStart,selDur)} onClick={submitReservation}>
-              {submitting ? '예약 중...' : (selStart ? `${selStart} – ${toTime(toMin(selStart)+selDur)} 예약하기` : '시간을 선택해주세요')}
-            </button>
-          </div>
+          )}
+          {draftRuns.length === 0 && msg && <div className={msg.startsWith('✅')?'info-box':'error-box'}>{msg}</div>}
         </React.Fragment>
       )}
 
@@ -825,7 +869,7 @@ function ReserveTab({ student }){
         ) : upcoming.map(r=>(
           <div className="res-row" key={r.id}>
             <div style={{display:'flex',alignItems:'center'}}>
-              <div className="room-badge">{r.room}번방</div>
+              <div className="room-badge">{roomLabel(r.room)}</div>
               <div>
                 <div className="res-time">{r.start} – {r.end}</div>
               </div>
@@ -1087,7 +1131,7 @@ function AdminReservationsTab(){
         if(rs.length===0) return null;
         return (
           <div className="card" key={room}>
-            <div className="card-title">{room}번방</div>
+            <div className="card-title">{roomFullLabel(room)}</div>
             {rs.map(r=>(
               <div className="res-row" key={r.id}>
                 <div>
