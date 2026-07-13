@@ -880,6 +880,8 @@ function ReserveTab({ student }){
         <DatePickerModal selDate={selDate} minDate={minDate} maxDate={maxDate}
           onSelect={(ds)=>setSelDate(ds)} onClose={()=>setShowCalendar(false)} />
       )}
+
+      <div className="budget-bar-wrap">
         <div style={{display:'flex',justifyContent:'space-between',fontSize:'12px',color:'var(--text-muted)'}}>
           <span>오늘 남은 예약 가능 시간{draftSlots.length>0 && ' (선택 반영)'}</span>
           <span style={{fontFamily:'var(--font-mono)',color:'var(--brass-bright)',fontWeight:700}}>{Math.floor(remainMin/60)}시간 {remainMin%60}분</span>
