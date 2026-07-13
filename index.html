@@ -269,6 +269,8 @@
   .tt-cell:last-child{border-right:none;}
   .tt-cell.empty{color:var(--text-faint);font-size:11px;}
   .tt-cell.booked{background:var(--brass-soft);cursor:pointer;}
+  .tt-cell.absent{background:var(--rec-soft);cursor:pointer;}
+  .tt-cell.makeup{background:#E7F0FE;cursor:pointer;}
   .tt-cell.booked:active{filter:brightness(0.95);}
   .tt-name{font-size:12px;font-weight:800;color:var(--brass-bright);line-height:1.3;}
   .tt-type{font-size:9.5px;color:var(--text-muted);margin-top:1px;}
@@ -428,6 +430,7 @@ const COL_STUDENTS = "juniper_students";
 const COL_RESERVATIONS = "juniper_reservations";
 const COL_NOTICES = "juniper_notices";
 const COL_BLOCKS = "juniper_blocks";
+const COL_OVERRIDES = "juniper_schedule_overrides";
 
 /* ============================================================
    HELPERS
@@ -1537,7 +1540,7 @@ function AdminReservationsTab(){
           <table className="timetable">
             <colgroup>
               <col style={{width:'56px'}} />
-              {ROOMS.map(r=><col key={r} style={{width:'auto'}} />)}
+              {ROOMS.map(r=><col key={r} style={{width:'calc((100% - 56px) / 4)'}} />)}
             </colgroup>
             <thead>
               <tr>
@@ -1905,10 +1908,20 @@ function NoticeEditModal({ notice, onClose }){
 }
 
 /* ============================================================
-   ADMIN: TIMETABLE TAB (전체 학생 수업 시간표)
+   ADMIN: TIMETABLE TAB (전체 학생 수업 시간표 + 결석/보강 관리)
    ============================================================ */
+function getMonday(offsetWeeks){
+  const d = new Date(); d.setHours(0,0,0,0);
+  const day = d.getDay(); // 0=일 ... 6=토
+  const diff = (day===0 ? -6 : 1-day) + offsetWeeks*7;
+  return addDays(d, diff);
+}
+
 function AdminTimetableTab(){
   const [students, setStudents] = useState([]);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [overrides, setOverrides] = useState([]);
+  const [editingCell, setEditingCell] = useState(null);
 
   useEffect(()=>{
     const unsub = db.collection(COL_STUDENTS).orderBy('name').onSnapshot(snap=>{
@@ -1920,48 +1933,106 @@ function AdminTimetableTab(){
   const DAYS = ['월','화','수','목','금'];
   const HOURS = BLOCK_HOURS.slice(0,-1); // 13:00 ~ 21:00 (시작 시간 기준)
 
-  function findEntries(day, hour){
+  const weekDates = useMemo(()=>{
+    const monday = getMonday(weekOffset);
+    return DAYS.map((_,i)=> addDays(monday, i));
+  }, [weekOffset]);
+  const weekDateStrs = weekDates.map(fmtDate);
+
+  useEffect(()=>{
+    const unsub = db.collection(COL_OVERRIDES).where('date','in', weekDateStrs).onSnapshot(snap=>{
+      setOverrides(snap.docs.map(d=>({id:d.id,...d.data()})));
+    }, err=>console.error(err));
+    return ()=>unsub();
+  }, [weekDateStrs.join(',')]);
+
+  function findRegular(day, hour){
     const list = [];
     students.forEach(s=>{
       (s.schedule||[]).forEach(sch=>{
-        if(sch.day===day && sch.start===hour) list.push({ name:s.name, type:s.type });
+        if(sch.day===day && sch.start===hour) list.push({ id:s.id, name:s.name, type:s.type });
       });
     });
     return list;
+  }
+
+  function cellData(dayIdx, hour){
+    const day = DAYS[dayIdx];
+    const date = weekDateStrs[dayIdx];
+    const regularEntries = findRegular(day, hour);
+    const absenceOverrides = overrides.filter(o=>o.kind==='absence' && o.date===date && o.start===hour);
+    const makeupOverrides = overrides.filter(o=>o.kind==='makeup' && o.date===date && o.start===hour);
+    return { day, date, hour, regularEntries, absenceOverrides, makeupOverrides };
+  }
+
+  function cellClass(cell){
+    if(cell.makeupOverrides.length>0) return 'tt-cell makeup';
+    if(cell.regularEntries.length>0){
+      const allAbsent = cell.regularEntries.every(en=>cell.absenceOverrides.some(a=>a.studentId===en.id));
+      return allAbsent ? 'tt-cell absent' : 'tt-cell booked';
+    }
+    return 'tt-cell empty';
   }
 
   return (
     <div className="screen">
       <div className="eyebrow">ADMIN</div>
       <h1 className="page-title">수업 시간표</h1>
-      <p className="page-sub">학생 관리에서 등록한 수업시간이 자동으로 반영돼요. (월~금, 13:00~22:00)</p>
+      <p className="page-sub">칸을 눌러 결석 처리하거나 보강 수업을 지정할 수 있어요. (월~금, 13:00~22:00)</p>
+
+      <div className="toggle-row" style={{marginBottom:16}}>
+        {['이번주','다음주','다다음주'].map((label,i)=>(
+          <div key={i} className={"toggle-opt"+(weekOffset===i?' active':'')} onClick={()=>setWeekOffset(i)}>{label}</div>
+        ))}
+      </div>
+      <p style={{fontSize:12,color:'var(--text-muted)',marginTop:-10,marginBottom:16}}>
+        {weekDates[0].getMonth()+1}월 {weekDates[0].getDate()}일 ~ {weekDates[4].getMonth()+1}월 {weekDates[4].getDate()}일
+      </p>
+
+      <div className="legend" style={{marginBottom:14}}>
+        <div className="legend-item"><div className="legend-dot" style={{background:'var(--brass-soft)',border:'1px solid var(--brass)'}}/>정규 수업</div>
+        <div className="legend-item"><div className="legend-dot" style={{background:'var(--rec-soft)',border:'1px solid var(--rec)'}}/>결석</div>
+        <div className="legend-item"><div className="legend-dot" style={{background:'#E7F0FE',border:'1px solid #2E6FE8'}}/>보강</div>
+      </div>
+
       <div className="timetable-wrap">
         <table className="timetable">
           <colgroup>
             <col style={{width:'52px'}} />
-            {DAYS.map(d=><col key={d} style={{width:'auto'}} />)}
+            {DAYS.map(d=><col key={d} style={{width:'calc((100% - 52px) / 5)'}} />)}
           </colgroup>
           <thead>
             <tr>
               <th className="tt-time-h"></th>
-              {DAYS.map(d=><th key={d}>{d}</th>)}
+              {weekDates.map((d,i)=>(
+                <th key={i}>{DAYS[i]}<div style={{fontSize:9.5,fontWeight:600,color:'var(--text-faint)',marginTop:1}}>{d.getMonth()+1}/{d.getDate()}</div></th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {HOURS.map(h=>(
               <tr key={h}>
                 <td className="tt-time">{h}</td>
-                {DAYS.map(d=>{
-                  const entries = findEntries(d,h);
-                  if(entries.length===0) return <td key={d} className="tt-cell empty">·</td>;
+                {DAYS.map((day,i)=>{
+                  const cell = cellData(i, h);
                   return (
-                    <td key={d} className="tt-cell booked">
-                      {entries.map((en,i)=>(
-                        <div key={i} style={{marginBottom:i<entries.length-1?4:0}}>
-                          <div className="tt-name">{en.name}</div>
-                          <div className="tt-type">{en.type==='exam'?'입시':'취미'}</div>
+                    <td key={i} className={cellClass(cell)} style={{cursor:'pointer'}} onClick={()=>setEditingCell(cell)}>
+                      {cell.regularEntries.map(en=>{
+                        const absent = cell.absenceOverrides.some(a=>a.studentId===en.id);
+                        return (
+                          <div key={en.id} style={{marginBottom:2}}>
+                            <div className="tt-name" style={absent?{color:'var(--rec)',textDecoration:'line-through'}:{}}>{en.name}</div>
+                            <div className="tt-type" style={absent?{color:'var(--rec)'}:{}}>{absent?'결석':(en.type==='exam'?'입시':'취미')}</div>
+                          </div>
+                        );
+                      })}
+                      {cell.makeupOverrides.map(mo=>(
+                        <div key={mo.id}>
+                          <div className="tt-name" style={{color:'#2E6FE8'}}>{mo.studentName}</div>
+                          <div className="tt-type" style={{color:'#2E6FE8'}}>보강</div>
                         </div>
                       ))}
+                      {cell.regularEntries.length===0 && cell.makeupOverrides.length===0 && '·'}
                     </td>
                   );
                 })}
@@ -1969,6 +2040,111 @@ function AdminTimetableTab(){
             ))}
           </tbody>
         </table>
+      </div>
+
+      {editingCell && <SlotOverrideModal cell={editingCell} students={students} onClose={()=>setEditingCell(null)} />}
+    </div>
+  );
+}
+
+function SlotOverrideModal({ cell, students, onClose }){
+  const { day, hour, date, regularEntries, absenceOverrides, makeupOverrides } = cell;
+  const [saving, setSaving] = useState(false);
+  const [makeupStudentId, setMakeupStudentId] = useState('');
+
+  const dateObj = new Date(date+'T00:00:00');
+  const dateLabel = `${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 (${day}) ${hour}`;
+
+  async function toggleAbsence(entry){
+    setSaving(true);
+    try{
+      const existing = absenceOverrides.find(a=>a.studentId===entry.id);
+      if(existing){
+        await db.collection(COL_OVERRIDES).doc(existing.id).delete();
+      } else {
+        await db.collection(COL_OVERRIDES).add({
+          date, day, start:hour, end:toTime(toMin(hour)+60),
+          kind:'absence', studentId:entry.id, studentName:entry.name, studentType:entry.type,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      onClose();
+    }catch(e){ alert('처리 중 오류가 발생했어요. 다시 시도해주세요.'); }
+    setSaving(false);
+  }
+
+  async function addMakeup(){
+    const student = students.find(s=>s.id===makeupStudentId);
+    if(!student) return;
+    setSaving(true);
+    try{
+      await db.collection(COL_OVERRIDES).add({
+        date, day, start:hour, end:toTime(toMin(hour)+60),
+        kind:'makeup', studentId:student.id, studentName:student.name, studentType:student.type,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      onClose();
+    }catch(e){ alert('처리 중 오류가 발생했어요. 다시 시도해주세요.'); }
+    setSaving(false);
+  }
+
+  async function removeMakeup(mo){
+    setSaving(true);
+    try{ await db.collection(COL_OVERRIDES).doc(mo.id).delete(); onClose(); }
+    catch(e){ alert('처리 중 오류가 발생했어요. 다시 시도해주세요.'); }
+    setSaving(false);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div className="modal-close-row">
+          <div className="modal-title">{dateLabel}</div>
+          <div className="icon-btn" onClick={onClose}>✕</div>
+        </div>
+
+        {regularEntries.length > 0 && (
+          <React.Fragment>
+            <div className="input-label">정규 수업</div>
+            {regularEntries.map(en=>{
+              const absent = absenceOverrides.some(a=>a.studentId===en.id);
+              return (
+                <div className="list-item-row" key={en.id} style={{cursor:'default'}}>
+                  <div>
+                    <div className="name" style={absent?{color:'var(--rec)',textDecoration:'line-through'}:{}}>{en.name}</div>
+                    <div className="meta">{en.type==='exam'?'입시생':'취미생'}{absent?` · ${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 결석 처리됨`:''}</div>
+                  </div>
+                  <button className={"btn btn-sm"+(absent?' btn-ghost':' btn-danger')} disabled={saving} onClick={()=>toggleAbsence(en)}>
+                    {absent ? '결석 취소' : '결석 처리'}
+                  </button>
+                </div>
+              );
+            })}
+          </React.Fragment>
+        )}
+
+        <div className="input-label" style={{marginTop:regularEntries.length>0?18:0}}>보강 수업</div>
+        {makeupOverrides.length > 0 ? makeupOverrides.map(mo=>(
+          <div className="list-item-row" key={mo.id} style={{cursor:'default'}}>
+            <div>
+              <div className="name" style={{color:'#2E6FE8'}}>{mo.studentName}</div>
+              <div className="meta">{mo.studentType==='exam'?'입시생':'취미생'} · {dateObj.getMonth()+1}월 {dateObj.getDate()}일 보강</div>
+            </div>
+            <button className="btn btn-danger btn-sm" disabled={saving} onClick={()=>removeMakeup(mo)}>삭제</button>
+          </div>
+        )) : (
+          <React.Fragment>
+            <p style={{fontSize:12.5,color:'var(--text-faint)',margin:'2px 0 12px'}}>이 시간에 등록된 보강 수업이 없어요.</p>
+            <select className="input" value={makeupStudentId} onChange={e=>setMakeupStudentId(e.target.value)} style={{marginBottom:10}}>
+              <option value="">보강 학생 선택</option>
+              {students.map(s=><option key={s.id} value={s.id}>{s.name} ({s.type==='exam'?'입시':'취미'})</option>)}
+            </select>
+            <button className="btn" disabled={saving || !makeupStudentId} onClick={addMakeup}>
+              {dateObj.getMonth()+1}월 {dateObj.getDate()}일 {hour} 보강으로 지정
+            </button>
+          </React.Fragment>
+        )}
       </div>
     </div>
   );
