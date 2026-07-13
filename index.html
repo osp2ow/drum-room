@@ -279,8 +279,8 @@
     margin-bottom:9px;
   }
   .res-row .room-badge{
-    font-family:var(--font-mono);font-size:11px;color:var(--brass);background:var(--brass-soft);
-    padding:3px 8px;border-radius:7px;margin-right:10px;flex-shrink:0;
+    font-family:var(--font-body);font-size:13.5px;font-weight:800;color:var(--brass-bright);background:var(--brass-soft);
+    padding:6px 11px;border-radius:9px;margin-right:10px;flex-shrink:0;
   }
   .res-row .res-time{font-family:var(--font-mono);font-size:13.5px;font-weight:700;}
   .res-row .res-sub{font-size:11px;color:var(--text-faint);margin-top:2px;}
@@ -413,7 +413,7 @@ const COL_BLOCKS = "juniper_blocks";
    ============================================================ */
 const DOW = ['일','월','화','수','목','금','토'];
 const ROOMS = [1,2,3,4];
-const ROOM_LABELS = { 1:'1번', 2:'2번', 3:'3번', 4:'버스킹드럼' };
+const ROOM_LABELS = { 1:'1번', 2:'2번', 3:'3번', 4:'버스킹' };
 function roomLabel(r){ return ROOM_LABELS[Number(r)] || (r+'번'); }
 function roomFullLabel(r){ return Number(r)===4 ? roomLabel(r) : roomLabel(r)+'방'; }
 function getAvailableRooms(type){ return type === 'exam' ? [1,2,3,4] : [1,2,3]; }
@@ -721,7 +721,7 @@ function HomeTab({ student, notices }){
         ) : todaysReservations.map(r=>(
           <div className="res-row" key={r.id}>
             <div style={{display:'flex',alignItems:'center'}}>
-              <div className="room-badge">{roomLabel(r.room)}</div>
+              <div className="room-badge">{roomFullLabel(r.room)}</div>
               <div className="res-time">{r.start} – {r.end}</div>
             </div>
           </div>
@@ -769,7 +769,7 @@ function HomeTab({ student, notices }){
         ) : selDayReservations.map(r=>(
           <div className="res-row" key={r.id}>
             <div style={{display:'flex',alignItems:'center'}}>
-              <div className="room-badge">{roomLabel(r.room)}</div>
+              <div className="room-badge">{roomFullLabel(r.room)}</div>
               <div className="res-time">{r.start} – {r.end}</div>
             </div>
           </div>
@@ -1032,7 +1032,7 @@ function ReserveTab({ student, blocks }){
         ) : upcoming.map(r=>(
           <div className="res-row" key={r.id}>
             <div style={{display:'flex',alignItems:'center'}}>
-              <div className="room-badge">{roomLabel(r.room)}</div>
+              <div className="room-badge">{roomFullLabel(r.room)}</div>
               <div>
                 <div className="res-time">{r.start} – {r.end}</div>
               </div>
