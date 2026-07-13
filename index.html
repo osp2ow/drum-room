@@ -254,7 +254,7 @@
   .status-badge.full{background:var(--rec-soft);color:#C7383C;}
 
   .timetable-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:16px;background:var(--surface);margin-bottom:14px;}
-  .timetable{border-collapse:collapse;width:100%;min-width:420px;}
+  .timetable{border-collapse:collapse;width:100%;min-width:420px;table-layout:fixed;}
   .timetable th{
     font-family:var(--font-display);font-size:12.5px;font-weight:700;color:var(--text);
     padding:10px 4px;text-align:center;background:var(--surface-2);border-bottom:1px solid var(--border);position:sticky;top:0;
@@ -1518,6 +1518,10 @@ function AdminReservationsTab(){
       ) : (
         <div className="timetable-wrap">
           <table className="timetable">
+            <colgroup>
+              <col style={{width:'56px'}} />
+              {ROOMS.map(r=><col key={r} style={{width:'auto'}} />)}
+            </colgroup>
             <thead>
               <tr>
                 <th className="tt-time-h"></th>
