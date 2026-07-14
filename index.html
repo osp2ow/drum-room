@@ -202,9 +202,7 @@
   .hero-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
   .hero-name{font-family:var(--font-display);font-size:15.5px;font-weight:800;letter-spacing:-0.01em;}
   .hero-sub{font-size:11.5px;color:rgba(255,255,255,0.9);font-weight:700;flex-shrink:0;}
-  .hero-schedule{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
-  .hero-schedule-chip{background:rgba(255,255,255,0.22);color:#FFFFFF;font-size:11px;font-weight:700;padding:4px 10px;border-radius:100px;white-space:nowrap;}
-  .hero-schedule-empty{font-size:11.5px;color:rgba(255,255,255,0.82);margin-top:8px;display:block;}
+  .hero-schedule-line{font-size:12px;font-weight:600;color:rgba(255,255,255,0.92);margin-top:9px;line-height:1.5;}
 
   .notice-banner{
     display:flex;gap:9px;align-items:flex-start;
@@ -770,15 +768,9 @@ function HomeTab({ student, notices }){
           <div className="hero-name">{student.name}님, 안녕하세요 🥁</div>
           <div className="hero-sub">{student.type === 'exam' ? '입시생' : '취미생'}</div>
         </div>
-        {schedule.length === 0 ? (
-          <span className="hero-schedule-empty">등록된 수업시간이 없어요. 원장님께 문의해주세요.</span>
-        ) : (
-          <div className="hero-schedule">
-            {schedule.map((s,i)=>(
-              <span key={i} className="hero-schedule-chip">{s.day} {s.start}–{s.end}</span>
-            ))}
-          </div>
-        )}
+        <div className="hero-schedule-line">
+          나의 수업시간 : {schedule.length === 0 ? '등록된 수업시간이 없어요' : schedule.map(s=>`${s.day}요일 ${hourLabel12(s.start)} ~ ${hourLabel12(s.end)}`).join(', ')}
+        </div>
       </div>
 
       <div className="card today-highlight">
