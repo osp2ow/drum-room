@@ -258,8 +258,9 @@
   .slot-cell .cell-x{font-size:28px;font-weight:800;line-height:1;color:var(--text-faint);}
   .slot-cell .cell-time-sub{font-size:9.5px;color:var(--text-faint);font-weight:600;}
   .slot-cell.free{border-color:rgba(47,191,175,0.35);cursor:pointer;}
-  .slot-cell.mine{background:var(--brass-soft);border-color:var(--brass);color:var(--brass-bright);}
+  .slot-cell.mine{background:var(--brass);border-color:var(--brass);color:#FFFFFF;font-weight:800;cursor:pointer;box-shadow:0 3px 8px rgba(47,191,175,0.35);}
   .slot-cell.other{background:var(--surface-3);border-color:var(--border);}
+  .slot-cell.duplicate{background:var(--surface-3);border-color:rgba(255,90,95,0.35);color:#C7383C;}
   .slot-cell.selected{background:var(--brass);border-color:var(--brass);color:#FFFFFF;font-weight:800;cursor:pointer;box-shadow:0 3px 8px rgba(47,191,175,0.35);}
   .slot-cell.blocked{opacity:0.4;}
   .slot-cell.past{background:var(--surface-3);border-color:var(--border);color:var(--text-faint);opacity:0.55;}
@@ -555,9 +556,9 @@ function runLenStartingAt(times, startIdx){
 function canAddSlotDisplay(type, existingMySlots, draftMySlots, room, time){
   const totalCount = existingMySlots.length + draftMySlots.length + 1;
   if(totalCount > dailyLimitSlots(type)) return false;
-  // 연속 사용/휴식 규칙은 지금 새로 선택 중인 칸(draft)들끼리만 계산해요.
-  // 이미 확정된 예약(existingMySlots)과 굳이 이어붙여서 앞칸까지 막을 필요는 없어요.
-  const times = draftMySlots.filter(s=>s.room===room).map(s=>toMin(s.time)).concat([toMin(time)]).sort((a,b)=>a-b);
+  // 확정된 예약 + 지금 선택 중인 칸을 합쳐서 연속 블록을 계산해요.
+  // 단, 아직 4칸(2시간)을 다 채우지 않은 '진행 중' 블록 때문에 멀리 있는 칸까지 미리 막지는 않아요.
+  const times = existingMySlots.concat(draftMySlots).filter(s=>s.room===room).map(s=>toMin(s.time)).concat([toMin(time)]).sort((a,b)=>a-b);
   const target = toMin(time);
   let idx = times.indexOf(target);
   let runLen = 1, i = idx, j = idx;
@@ -929,8 +930,18 @@ function ReserveTab({ student, blocks }){
     if(isClosed) return 'closed';
     if(existingSlots.some(sl=>sl.room===room && sl.time===time)) return 'mine';
     if(draftSlots.some(sl=>sl.room===room && sl.time===time)) return 'selected';
+    const isDuplicate = existingSlots.some(sl=>sl.time===time && sl.room!==room) || draftSlots.some(sl=>sl.time===time && sl.room!==room);
+    if(isDuplicate) return 'duplicate';
     const ok = canAddSlotDisplay(student.type, existingSlots, draftSlots, room, time);
     return ok ? 'free' : 'blocked';
+  }
+
+  async function cancelSlotReservation(room, time){
+    const s = toMin(time), e = s + 30;
+    const res = dayReservations.find(r => Number(r.room)===room && r.studentId===student.id && toMin(r.start)<e && s<toMin(r.end));
+    if(!res) return;
+    if(!window.confirm(`${res.start} – ${res.end} 예약을 취소하시겠습니까?`)) return;
+    await db.collection(COL_RESERVATIONS).doc(res.id).delete();
   }
 
   function toggleSlot(room, time){
@@ -940,6 +951,8 @@ function ReserveTab({ student, blocks }){
       setMsg('');
     } else if(state === 'selected'){
       setDraftSlots(prev=>prev.filter(sl=>!(sl.room===room && sl.time===time)));
+    } else if(state === 'mine'){
+      cancelSlotReservation(room, time);
     }
   }
 
@@ -962,6 +975,13 @@ function ReserveTab({ student, blocks }){
         return blocks.some(b=> Number(b.room)===sl.room && b.day===dow && toMin(b.start)<e && s<toMin(b.end));
       });
       if(blockConflict){ setMsg('선택한 시간 중 예약이 막혀있는 시간이 포함되어 있어요. 선택을 다시 확인해주세요.'); setSubmitting(false); return; }
+
+      const freshMineAll = expandToSlots(freshList.filter(r=>r.studentId===student.id));
+      const dupConflict = draftSlots.some(sl=>
+        freshMineAll.some(m=>m.time===sl.time && m.room!==sl.room) ||
+        draftSlots.some(other=>other!==sl && other.time===sl.time && other.room!==sl.room)
+      );
+      if(dupConflict){ setMsg('같은 시간에 다른 방과 중복 예약된 시간이 있어요. 선택을 다시 확인해주세요.'); setSubmitting(false); return; }
 
       const freshExisting = expandToSlots(freshList.filter(r=>r.studentId===student.id));
       let running = freshExisting.slice();
@@ -1068,6 +1088,7 @@ function ReserveTab({ student, blocks }){
                             <span className="cell-time">{t}</span>
                             {st==='closed' && <span className="cell-tag">🔒 차단</span>}
                             {st==='blocked' && <span className="cell-tag">🚫 불가</span>}
+                            {st==='duplicate' && <span className="cell-tag">⚠️ 중복예약</span>}
                           </React.Fragment>
                         )}
                       </div>
@@ -1079,6 +1100,7 @@ function ReserveTab({ student, blocks }){
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--surface-3)',border:'1px solid var(--border)'}}/>예약마감</div>
                   <div className="legend-item">🚫 규칙상 불가</div>
                   <div className="legend-item">🔒 예약 불가(관리자 차단)</div>
+                  <div className="legend-item">⚠️ 다른 방과 중복</div>
                 </div>
               </React.Fragment>
             )}
