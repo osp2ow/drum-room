@@ -1483,10 +1483,10 @@ function StudentShell({ student, onLogout }){
   return (
     <React.Fragment>
       <AppHeader right={<span>{liveStudent.type==='exam'?'입시생':'취미생'}</span>} />
-      {tab==='home' && <HomeTab student={liveStudent} notices={visibleNotices} />}
-      {tab==='reserve' && <ReserveTab student={liveStudent} blocks={blocks} />}
-      {tab==='status' && <StatusTab student={liveStudent} blocks={blocks} />}
-      {tab==='my' && <MyTab student={liveStudent} notices={visibleNotices} onLogout={onLogout} />}
+      <div style={{display: tab==='home' ? 'block' : 'none'}}><HomeTab student={liveStudent} notices={visibleNotices} /></div>
+      <div style={{display: tab==='reserve' ? 'block' : 'none'}}><ReserveTab student={liveStudent} blocks={blocks} /></div>
+      <div style={{display: tab==='status' ? 'block' : 'none'}}><StatusTab student={liveStudent} blocks={blocks} /></div>
+      <div style={{display: tab==='my' ? 'block' : 'none'}}><MyTab student={liveStudent} notices={visibleNotices} onLogout={onLogout} /></div>
       <TabBar tabs={tabs} active={tab} onChange={setTab} />
     </React.Fragment>
   );
@@ -2397,11 +2397,11 @@ function AdminShell({ onLogout }){
   return (
     <React.Fragment>
       <AppHeader subtitle="ADMIN MODE" right={<span onClick={onLogout} style={{cursor:'pointer',textDecoration:'underline'}}>로그아웃</span>} />
-      {tab==='students' && <AdminStudentsTab/>}
-      {tab==='timetable' && <AdminTimetableTab/>}
-      {tab==='reservations' && <AdminReservationsTab/>}
-      {tab==='blocks' && <AdminBlocksTab/>}
-      {tab==='notices' && <AdminNoticesTab/>}
+      <div style={{display: tab==='students' ? 'block' : 'none'}}><AdminStudentsTab/></div>
+      <div style={{display: tab==='timetable' ? 'block' : 'none'}}><AdminTimetableTab/></div>
+      <div style={{display: tab==='reservations' ? 'block' : 'none'}}><AdminReservationsTab/></div>
+      <div style={{display: tab==='blocks' ? 'block' : 'none'}}><AdminBlocksTab/></div>
+      <div style={{display: tab==='notices' ? 'block' : 'none'}}><AdminNoticesTab/></div>
       <TabBar tabs={tabs} active={tab} onChange={setTab} />
     </React.Fragment>
   );
