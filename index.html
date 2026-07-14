@@ -224,7 +224,9 @@
   .res-dot{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--rec);}
   .res-dot.on-active{background:#FFFFFF;}
 
-  .date-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;}
+  .date-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;cursor:grab;}
+  .date-scroll.dragging{cursor:grabbing;user-select:none;}
+  .date-scroll.dragging *{user-select:none;}
   .date-chip{
     flex-shrink:0;width:58px;padding:11px 0;border-radius:13px;text-align:center;
     background:var(--surface);border:1px solid var(--border);cursor:pointer;
@@ -421,6 +423,52 @@
 
 <script type="text/babel">
 const { useState, useEffect, useMemo, useCallback } = React;
+
+// 데스크톱에서 마우스로 끌거나 휠로 가로 스크롤할 수 있게 해주는 훅 (모바일 터치 스와이프는 그대로 동작)
+function useHScroll(){
+  const ref = React.useRef(null);
+  useEffect(()=>{
+    const el = ref.current;
+    if(!el) return;
+    let isDown = false, startX = 0, startScroll = 0, moved = false;
+    function onDown(e){
+      isDown = true; moved = false;
+      el.classList.add('dragging');
+      startX = e.pageX; startScroll = el.scrollLeft;
+    }
+    function endDrag(){
+      if(isDown){ isDown = false; el.classList.remove('dragging'); }
+    }
+    function onMove(e){
+      if(!isDown) return;
+      const dx = e.pageX - startX;
+      if(Math.abs(dx) > 3) moved = true;
+      el.scrollLeft = startScroll - dx;
+    }
+    function onClickCapture(e){
+      if(moved){ e.stopPropagation(); e.preventDefault(); }
+    }
+    function onWheel(e){
+      if(Math.abs(e.deltaY) > Math.abs(e.deltaX) && el.scrollWidth > el.clientWidth){
+        el.scrollLeft += e.deltaY;
+        e.preventDefault();
+      }
+    }
+    el.addEventListener('mousedown', onDown);
+    window.addEventListener('mouseup', endDrag);
+    window.addEventListener('mousemove', onMove);
+    el.addEventListener('click', onClickCapture, true);
+    el.addEventListener('wheel', onWheel, { passive:false });
+    return ()=>{
+      el.removeEventListener('mousedown', onDown);
+      window.removeEventListener('mouseup', endDrag);
+      window.removeEventListener('mousemove', onMove);
+      el.removeEventListener('click', onClickCapture, true);
+      el.removeEventListener('wheel', onWheel);
+    };
+  }, []);
+  return ref;
+}
 
 /* ============================================================
    FIREBASE CONFIG - 여기를 본인 프로젝트 값으로 교체하세요
@@ -766,6 +814,7 @@ function TabBar({ tabs, active, onChange }){
    STUDENT: HOME TAB
    ============================================================ */
 function HomeTab({ student, notices }){
+  const weekScrollRef = useHScroll();
   const schedule = student.schedule || [];
   const latestNotice = notices[0];
   const [myReservations, setMyReservations] = useState([]);
@@ -833,7 +882,7 @@ function HomeTab({ student, notices }){
 
       <div className="card">
         <div className="card-title">🥁 이번주 내 연습실 예약</div>
-        <div className="date-scroll" style={{marginBottom:14}}>
+        <div className="date-scroll" ref={weekScrollRef} style={{marginBottom:14}}>
           {weekDates.map(d=>{
             const ds = fmtDate(d);
             const isToday = ds === todayStr;
@@ -871,6 +920,7 @@ function HomeTab({ student, notices }){
    STUDENT: RESERVE TAB
    ============================================================ */
 function ReserveTab({ student, blocks }){
+  const dateScrollRef = useHScroll();
   const availableRooms = useMemo(()=> getAvailableRooms(student.type), [student.type]);
   const [selDate, setSelDate] = useState(fmtDate(new Date()));
   const [selRoom, setSelRoom] = useState(availableRooms[0]);
@@ -1048,7 +1098,7 @@ function ReserveTab({ student, blocks }){
       <p className="page-sub">{student.type==='exam' ? '입시생: 하루 최대 3시간, 한 방 2시간 연속 후 1시간 휴식 또는 다른방으로 이어서 사용' : '취미생: 하루 최대 1시간'}</p>
 
       <div className="date-scroll-row">
-        <div className="date-scroll">
+        <div className="date-scroll" ref={dateScrollRef}>
           {dates.map(d=>{
             const ds = fmtDate(d);
             const isToday = ds === fmtDate(new Date());
@@ -1583,6 +1633,7 @@ function StudentEditModal({ student, onClose }){
    ADMIN: RESERVATIONS TAB
    ============================================================ */
 function AdminReservationsTab(){
+  const dateScrollRef = useHScroll();
   const [selDate, setSelDate] = useState(fmtDate(new Date()));
   const [reservations, setReservations] = useState([]);
   const [editing, setEditing] = useState(null);
@@ -1614,7 +1665,7 @@ function AdminReservationsTab(){
       <div className="eyebrow">ADMIN</div>
       <h1 className="page-title">예약 일정표</h1>
       <p className="page-sub">날짜를 고르면 전체 방의 예약 현황을 한눈에 볼 수 있어요. 예약 칸을 눌러서 수정·취소할 수 있어요.</p>
-      <div className="date-scroll">
+      <div className="date-scroll" ref={dateScrollRef}>
         {dates.map(d=>{
           const ds = fmtDate(d);
           return (
