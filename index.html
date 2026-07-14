@@ -255,7 +255,7 @@
   .status-badge.full{background:var(--rec-soft);color:#C7383C;}
 
   .timetable-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:16px;background:var(--surface);margin-bottom:14px;}
-  .timetable{border-collapse:collapse;width:100%;min-width:420px;table-layout:fixed;}
+  .timetable{border-collapse:collapse;width:100%;table-layout:fixed;}
   .timetable th{
     font-family:var(--font-display);font-size:12.5px;font-weight:700;color:var(--text);
     padding:10px 4px;text-align:center;background:var(--surface-2);border-bottom:1px solid var(--border);position:sticky;top:0;
@@ -2027,7 +2027,7 @@ function AdminTimetableTab(){
                         const absenceEntry = cell.absenceOverrides.find(a=>a.studentId===en.id);
                         const absent = !!absenceEntry;
                         const col = (solidAbsent || solidMakeup) ? '#FFFFFF' : (absent ? 'var(--rec)' : undefined);
-                        const dateLabel = absent ? (()=>{ const d = new Date(absenceEntry.date+'T00:00:00'); return `${d.getMonth()+1}월${d.getDate()}일`; })() : null;
+                        const dateLabel = absent ? (()=>{ const d = new Date(absenceEntry.date+'T00:00:00'); return `${d.getMonth()+1}월${d.getDate()}일 결석`; })() : null;
                         return (
                           <div key={en.id} style={{marginBottom:2}}>
                             <div className="tt-name" style={{color:col, textDecoration: absent?'line-through':'none'}}>{en.name}</div>
@@ -2040,7 +2040,7 @@ function AdminTimetableTab(){
                         return (
                           <div key={mo.id}>
                             <div className="tt-name" style={{color:'#FFFFFF'}}>{mo.studentName}</div>
-                            <div className="tt-type" style={{color:'#FFFFFF'}}>{d.getMonth()+1}월{d.getDate()}일</div>
+                            <div className="tt-type" style={{color:'#FFFFFF'}}>{d.getMonth()+1}월{d.getDate()}일 보강</div>
                           </div>
                         );
                       })}
@@ -2067,7 +2067,6 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
   const [manualName, setManualName] = useState('');
   const [makeupWeek, setMakeupWeek] = useState(0);
   const [noteText, setNoteText] = useState(cell.noteOverride?.note || '');
-  const [noteSaved, setNoteSaved] = useState(false);
 
   // 최신 overrides 기준으로 항상 다시 계산 (모달을 닫지 않고도 바로 반영되도록)
   const regularEntries = cell.regularEntries;
@@ -2140,10 +2139,8 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       }
-      setNoteSaved(true);
-      setTimeout(()=>setNoteSaved(false), 1800);
-    }catch(e){ alert('메모 저장 중 오류가 발생했어요.'); }
-    setSaving(false);
+      onClose();
+    }catch(e){ alert('메모 저장 중 오류가 발생했어요.'); setSaving(false); }
   }
 
   return (
@@ -2217,7 +2214,7 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
 
         <div className="input-label">메모</div>
         <textarea className="input" rows="3" placeholder="이 시간에 대한 메모를 남겨보세요" value={noteText} onChange={e=>setNoteText(e.target.value)} style={{resize:'vertical',marginBottom:8}} />
-        <button className="btn btn-ghost btn-sm" disabled={saving} onClick={saveNote} style={{width:'100%'}}>{noteSaved ? '✓ 저장됨' : '저장'}</button>
+        <button className="btn btn-ghost btn-sm" disabled={saving} onClick={saveNote} style={{width:'100%'}}>저장</button>
       </div>
     </div>
   );
