@@ -202,7 +202,7 @@
   .hero-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
   .hero-name{font-family:var(--font-display);font-size:15.5px;font-weight:800;letter-spacing:-0.01em;}
   .hero-sub{font-size:11.5px;color:rgba(255,255,255,0.9);font-weight:700;flex-shrink:0;}
-  .hero-schedule-line{font-family:var(--font-display);font-size:15.5px;font-weight:800;letter-spacing:-0.01em;color:#FFFFFF;margin-top:9px;line-height:1.4;}
+  .hero-schedule-line{font-family:var(--font-display);font-size:15.5px;font-weight:500;letter-spacing:-0.01em;color:#FFFFFF;margin-top:9px;line-height:1.4;}
 
   .notice-banner{
     display:flex;gap:9px;align-items:flex-start;
@@ -247,16 +247,16 @@
   .room-tab.active .rn{color:var(--brass);}
   .room-tab .rt{font-family:var(--font-display);font-weight:700;font-size:16px;margin-top:2px;}
 
-  .slot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:6px;}
+  .slot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px;}
   .slot-cell{
-    aspect-ratio:1.1;border-radius:14px;border:1.5px solid var(--border);
-    background:var(--surface-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    aspect-ratio:1.3;border-radius:13px;border:1.5px solid var(--border);
+    background:var(--surface-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
     font-family:var(--font-mono);color:var(--text);position:relative;letter-spacing:0.01em;
   }
-  .slot-cell .cell-time{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;}
-  .slot-cell .cell-tag{font-size:11px;font-weight:800;letter-spacing:0.01em;}
-  .slot-cell .cell-x{font-size:32px;font-weight:800;line-height:1;color:var(--text-faint);}
-  .slot-cell .cell-time-sub{font-size:10.5px;color:var(--text-faint);font-weight:600;}
+  .slot-cell .cell-time{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .slot-cell .cell-tag{font-size:9.5px;font-weight:800;letter-spacing:0.01em;}
+  .slot-cell .cell-x{font-size:28px;font-weight:800;line-height:1;color:var(--text-faint);}
+  .slot-cell .cell-time-sub{font-size:9.5px;color:var(--text-faint);font-weight:600;}
   .slot-cell.free{border-color:rgba(47,191,175,0.35);cursor:pointer;}
   .slot-cell.mine{background:var(--brass-soft);border-color:var(--brass);color:var(--brass-bright);}
   .slot-cell.other{background:var(--surface-3);border-color:var(--border);}
@@ -770,7 +770,7 @@ function HomeTab({ student, notices }){
           <div className="hero-sub">{student.type === 'exam' ? '입시생' : '취미생'}</div>
         </div>
         <div className="hero-schedule-line">
-          나의 수업시간 : {schedule.length === 0 ? '등록된 수업시간이 없어요' : schedule.map(s=>`${s.day}요일 ${hourLabel12(s.start)} ~ ${hourLabel12(s.end)}`).join(', ')}
+          나의 수업시간 : {schedule.length === 0 ? '등록된 수업시간이 없어요' : schedule.map(s=>`${s.day}요일 ${hourLabel12(s.start)}`).join(', ')}
         </div>
       </div>
 
