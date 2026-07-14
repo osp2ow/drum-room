@@ -202,7 +202,7 @@
   .hero-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
   .hero-name{font-family:var(--font-display);font-size:15.5px;font-weight:800;letter-spacing:-0.01em;}
   .hero-sub{font-size:11.5px;color:rgba(255,255,255,0.9);font-weight:700;flex-shrink:0;}
-  .hero-schedule-line{font-size:12px;font-weight:600;color:rgba(255,255,255,0.92);margin-top:9px;line-height:1.5;}
+  .hero-schedule-line{font-family:var(--font-display);font-size:15.5px;font-weight:800;letter-spacing:-0.01em;color:#FFFFFF;margin-top:9px;line-height:1.4;}
 
   .notice-banner{
     display:flex;gap:9px;align-items:flex-start;
@@ -226,37 +226,37 @@
 
   .date-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;}
   .date-chip{
-    flex-shrink:0;width:52px;padding:10px 0;border-radius:13px;text-align:center;
+    flex-shrink:0;width:62px;padding:13px 0;border-radius:14px;text-align:center;
     background:var(--surface);border:1px solid var(--border);cursor:pointer;
   }
   .date-chip.active{background:var(--brass);border-color:var(--brass);}
-  .date-chip .dow{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text-muted);}
+  .date-chip .dow{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-muted);}
   .date-chip.active .dow{color:rgba(255,255,255,0.9);}
-  .date-chip .num{font-family:var(--font-display);font-size:16px;font-weight:700;margin-top:2px;}
+  .date-chip .num{font-family:var(--font-display);font-size:20px;font-weight:700;margin-top:3px;}
   .date-chip.active .num{color:#FFFFFF;}
   .date-chip.today .num::after{content:'';display:block;width:4px;height:4px;border-radius:50%;background:var(--rec);margin:3px auto 0;}
   .date-chip.active.today .num::after{background:#FFFFFF;}
 
   .room-tabs{display:flex;gap:7px;margin-bottom:16px;}
   .room-tab{
-    flex:1;text-align:center;padding:11px 4px;border-radius:11px;border:1px solid var(--border);
+    flex:1;text-align:center;padding:13px 4px;border-radius:12px;border:1px solid var(--border);
     background:var(--surface);cursor:pointer;
   }
   .room-tab.active{border-color:var(--brass);background:var(--brass-soft);}
-  .room-tab .rn{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);}
+  .room-tab .rn{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);}
   .room-tab.active .rn{color:var(--brass);}
-  .room-tab .rt{font-family:var(--font-display);font-weight:700;font-size:14px;margin-top:1px;}
+  .room-tab .rt{font-family:var(--font-display);font-weight:700;font-size:16px;margin-top:2px;}
 
-  .slot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px;}
+  .slot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:6px;}
   .slot-cell{
-    aspect-ratio:1.3;border-radius:13px;border:1.5px solid var(--border);
-    background:var(--surface-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    aspect-ratio:1.1;border-radius:14px;border:1.5px solid var(--border);
+    background:var(--surface-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
     font-family:var(--font-mono);color:var(--text);position:relative;letter-spacing:0.01em;
   }
-  .slot-cell .cell-time{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;}
-  .slot-cell .cell-tag{font-size:9.5px;font-weight:800;letter-spacing:0.01em;}
-  .slot-cell .cell-x{font-size:28px;font-weight:800;line-height:1;color:var(--text-faint);}
-  .slot-cell .cell-time-sub{font-size:9.5px;color:var(--text-faint);font-weight:600;}
+  .slot-cell .cell-time{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .slot-cell .cell-tag{font-size:11px;font-weight:800;letter-spacing:0.01em;}
+  .slot-cell .cell-x{font-size:32px;font-weight:800;line-height:1;color:var(--text-faint);}
+  .slot-cell .cell-time-sub{font-size:10.5px;color:var(--text-faint);font-weight:600;}
   .slot-cell.free{border-color:rgba(47,191,175,0.35);cursor:pointer;}
   .slot-cell.mine{background:var(--brass-soft);border-color:var(--brass);color:var(--brass-bright);}
   .slot-cell.other{background:var(--surface-3);border-color:var(--border);}
