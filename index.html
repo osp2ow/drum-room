@@ -196,12 +196,26 @@
 
   .hero-card{
     background:linear-gradient(135deg, var(--brass), var(--brass-bright));
-    border-radius:22px;padding:26px 22px;margin-bottom:16px;color:#FFFFFF;
-    box-shadow:0 10px 22px rgba(47,191,175,0.28);
+    border-radius:16px;padding:14px 18px;margin-bottom:14px;color:#FFFFFF;
+    box-shadow:0 6px 14px rgba(47,191,175,0.25);
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
   }
-  .hero-eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;color:rgba(255,255,255,0.85);text-transform:uppercase;margin-bottom:8px;font-weight:700;}
-  .hero-name{font-family:var(--font-display);font-size:22px;font-weight:800;margin-bottom:8px;letter-spacing:-0.01em;}
-  .hero-sub{font-size:13.5px;color:rgba(255,255,255,0.92);line-height:1.55;}
+  .hero-name{font-family:var(--font-display);font-size:15.5px;font-weight:800;letter-spacing:-0.01em;}
+  .hero-sub{font-size:11.5px;color:rgba(255,255,255,0.9);font-weight:700;flex-shrink:0;}
+
+  .notice-banner{
+    display:flex;gap:9px;align-items:flex-start;
+    background:var(--brass-soft);border:1px solid rgba(47,191,175,0.3);
+    border-radius:14px;padding:11px 13px;margin-bottom:14px;cursor:default;
+  }
+  .notice-banner-badge{
+    flex-shrink:0;background:var(--brass);color:#FFFFFF;font-size:10px;font-weight:800;
+    padding:3px 8px;border-radius:100px;margin-top:1px;
+  }
+  .notice-banner-text{
+    font-size:12.5px;color:var(--text);line-height:1.45;font-weight:600;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
 
   .today-highlight{border:1.5px solid var(--brass);background:linear-gradient(160deg, var(--brass-soft), var(--surface) 65%);}
 
@@ -741,10 +755,16 @@ function HomeTab({ student, notices }){
 
   return (
     <div className="screen">
+      {latestNotice && (
+        <div className="notice-banner">
+          <span className="notice-banner-badge">공지</span>
+          <span className="notice-banner-text">{latestNotice.important && '⭐ '}{latestNotice.title} — {latestNotice.content}</span>
+        </div>
+      )}
+
       <div className="hero-card">
-        <div className="hero-eyebrow">WELCOME</div>
         <div className="hero-name">{student.name}님, 안녕하세요 🥁</div>
-        <div className="hero-sub">{student.type === 'exam' ? '입시생' : '취미생'} 과정으로 등록되어 있어요.</div>
+        <div className="hero-sub">{student.type === 'exam' ? '입시생' : '취미생'}</div>
       </div>
 
       <div className="card today-highlight">
@@ -814,14 +834,6 @@ function HomeTab({ student, notices }){
           </div>
         ))}
       </div>
-
-      {latestNotice && (
-        <div className="card">
-          <div className="card-title">📢 최근 공지</div>
-          <div className="notice-title">{latestNotice.important && '⭐ '}{latestNotice.title}</div>
-          <div className="notice-body" style={{ display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{latestNotice.content}</div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1341,13 +1353,15 @@ function StudentShell({ student, onLogout }){
     { key:'my', label:'마이', icon:<Icon.user/> },
   ];
 
+  const visibleNotices = notices.filter(n => !n.audience || n.audience==='all' || n.audience===liveStudent.type);
+
   return (
     <React.Fragment>
       <AppHeader right={<span>{liveStudent.type==='exam'?'입시생':'취미생'}</span>} />
-      {tab==='home' && <HomeTab student={liveStudent} notices={notices} />}
+      {tab==='home' && <HomeTab student={liveStudent} notices={visibleNotices} />}
       {tab==='reserve' && <ReserveTab student={liveStudent} blocks={blocks} />}
       {tab==='status' && <StatusTab student={liveStudent} blocks={blocks} />}
-      {tab==='my' && <MyTab student={liveStudent} notices={notices} onLogout={onLogout} />}
+      {tab==='my' && <MyTab student={liveStudent} notices={visibleNotices} onLogout={onLogout} />}
       <TabBar tabs={tabs} active={tab} onChange={setTab} />
     </React.Fragment>
   );
@@ -1858,7 +1872,12 @@ function AdminNoticesTab(){
         <div className="empty-state"><p>등록된 공지사항이 없어요.</p></div>
       ) : notices.map(n=>(
         <div className={"notice-item"+(n.important?' important':'')} key={n.id} onClick={()=>setEditing(n)} style={{cursor:'pointer'}}>
-          <div className="notice-title">{n.important && '⭐ '}{n.title}</div>
+          <div className="notice-title">
+            {n.important && '⭐ '}{n.title}
+            <span className="tag tag-hobby" style={{marginLeft:8,verticalAlign:'middle'}}>
+              {n.audience==='hobby' ? '취미생' : n.audience==='exam' ? '입시생' : '전체'}
+            </span>
+          </div>
           <div className="notice-body" style={{ display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{n.content}</div>
         </div>
       ))}
@@ -1871,15 +1890,16 @@ function NoticeEditModal({ notice, onClose }){
   const [title, setTitle] = useState(notice?.title || '');
   const [content, setContent] = useState(notice?.content || '');
   const [important, setImportant] = useState(notice?.important || false);
+  const [audience, setAudience] = useState(notice?.audience || 'all');
   const [saving, setSaving] = useState(false);
 
   async function save(){
     if(!title.trim() || !content.trim()) return;
     setSaving(true);
     if(notice){
-      await db.collection(COL_NOTICES).doc(notice.id).update({ title, content, important });
+      await db.collection(COL_NOTICES).doc(notice.id).update({ title, content, important, audience });
     } else {
-      await db.collection(COL_NOTICES).add({ title, content, important, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      await db.collection(COL_NOTICES).add({ title, content, important, audience, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
     }
     setSaving(false);
     onClose();
@@ -1897,6 +1917,13 @@ function NoticeEditModal({ notice, onClose }){
         <div className="modal-close-row">
           <div className="modal-title">{notice ? '공지 수정' : '새 공지 작성'}</div>
           <div className="icon-btn" onClick={onClose}>✕</div>
+        </div>
+
+        <div className="input-label">공지 대상</div>
+        <div className="toggle-row" style={{marginBottom:18}}>
+          <div className={"toggle-opt"+(audience==='all'?' active':'')} onClick={()=>setAudience('all')}>전체</div>
+          <div className={"toggle-opt"+(audience==='hobby'?' active':'')} onClick={()=>setAudience('hobby')}>취미생</div>
+          <div className={"toggle-opt"+(audience==='exam'?' active':'')} onClick={()=>setAudience('exam')}>입시생</div>
         </div>
         <div className="input-group">
           <label className="input-label">제목</label>
