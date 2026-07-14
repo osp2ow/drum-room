@@ -2024,14 +2024,18 @@ function AdminTimetableTab(){
                   return (
                     <td key={i} className={cls} style={{cursor:'pointer'}} onClick={()=>setEditingCell(cell)}>
                       {cell.regularEntries.map(en=>{
-                        const absenceEntry = cell.absenceOverrides.find(a=>a.studentId===en.id);
-                        const absent = !!absenceEntry;
+                        const absenceEntries = cell.absenceOverrides.filter(a=>a.studentId===en.id).sort((a,b)=> a.date<b.date?-1:1);
+                        const absent = absenceEntries.length>0;
                         const col = (solidAbsent || solidMakeup) ? '#FFFFFF' : (absent ? 'var(--rec)' : undefined);
-                        const dateLabel = absent ? (()=>{ const d = new Date(absenceEntry.date+'T00:00:00'); return `${d.getMonth()+1}월${d.getDate()}일 결석`; })() : null;
+                        const dateLabels = absenceEntries.map(a=>{ const d = new Date(a.date+'T00:00:00'); return `${d.getMonth()+1}월${d.getDate()}일 결석`; });
                         return (
                           <div key={en.id} style={{marginBottom:2}}>
                             <div className="tt-name" style={{color:col, textDecoration: absent?'line-through':'none'}}>{en.name}</div>
-                            <div className="tt-type" style={{color:col}}>{absent ? dateLabel : (en.type==='exam'?'입시':'취미')}</div>
+                            {absent ? dateLabels.map((lbl,li)=>(
+                              <div key={li} className="tt-type" style={{color:col}}>{lbl}</div>
+                            )) : (
+                              <div className="tt-type" style={{color:col}}>{en.type==='exam'?'입시':'취미'}</div>
+                            )}
                           </div>
                         );
                       })}
