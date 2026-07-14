@@ -1975,7 +1975,7 @@ function AdminTimetableTab(){
     const regularEntries = findRegular(day, hour);
     const regularIds = regularEntries.map(en=>en.id);
     const absenceOverrides = overrides.filter(o=> o.kind==='absence' && o.start===hour && (o.date===date || o.date===nextDate) && regularIds.includes(o.studentId));
-    const makeupOverrides = overrides.filter(o=>o.kind==='makeup' && o.date===date && o.start===hour);
+    const makeupOverrides = overrides.filter(o=>o.kind==='makeup' && o.start===hour && (o.date===date || o.date===nextDate));
     const noteOverride = overrides.find(o=>o.kind==='note' && o.date===date && o.start===hour) || null;
     return { day, dayIdx, date, nextDate, hour, regularEntries, absenceOverrides, makeupOverrides, noteOverride };
   }
@@ -2035,12 +2035,15 @@ function AdminTimetableTab(){
                           </div>
                         );
                       })}
-                      {cell.makeupOverrides.map(mo=>(
-                        <div key={mo.id}>
-                          <div className="tt-name" style={{color:'#FFFFFF'}}>{mo.studentName}</div>
-                          <div className="tt-type" style={{color:'#FFFFFF'}}>보강</div>
-                        </div>
-                      ))}
+                      {cell.makeupOverrides.map(mo=>{
+                        const d = new Date(mo.date+'T00:00:00');
+                        return (
+                          <div key={mo.id}>
+                            <div className="tt-name" style={{color:'#FFFFFF'}}>{mo.studentName}</div>
+                            <div className="tt-type" style={{color:'#FFFFFF'}}>{d.getMonth()+1}월{d.getDate()}일</div>
+                          </div>
+                        );
+                      })}
                       {cell.regularEntries.length===0 && cell.makeupOverrides.length===0 && '·'}
                       {cell.noteOverride && <div className="tt-note-dot">📝</div>}
                     </td>
@@ -2062,21 +2065,23 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
   const [saving, setSaving] = useState(false);
   const [makeupStudentId, setMakeupStudentId] = useState('');
   const [manualName, setManualName] = useState('');
+  const [makeupWeek, setMakeupWeek] = useState(0);
   const [noteText, setNoteText] = useState(cell.noteOverride?.note || '');
   const [noteSaved, setNoteSaved] = useState(false);
 
   // 최신 overrides 기준으로 항상 다시 계산 (모달을 닫지 않고도 바로 반영되도록)
   const regularEntries = cell.regularEntries;
-  const makeupOverrides = overrides.filter(o=>o.kind==='makeup' && o.date===date && o.start===hour);
-  const noteOverride = overrides.find(o=>o.kind==='note' && o.date===date && o.start===hour) || null;
-
-  const dateObj = new Date(date+'T00:00:00');
-  const dateLabel = `${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 (${day}) ${hourLabel12(hour)}`;
   const WEEK_LABELS = ['이번주','다음주'];
 
   function weekDate(offset){
     return fmtDate(addDays(getMonday(offset), dayIdx));
   }
+
+  const makeupOverrides = overrides.filter(o=>o.kind==='makeup' && o.start===hour && (o.date===weekDate(0) || o.date===weekDate(1)));
+  const noteOverride = overrides.find(o=>o.kind==='note' && o.date===date && o.start===hour) || null;
+
+  const dateObj = new Date(date+'T00:00:00');
+  const dateLabel = `${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 (${day}) ${hourLabel12(hour)}`;
 
   async function toggleAbsence(entry, targetDate){
     setSaving(true);
@@ -2099,10 +2104,11 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
     const student = students.find(s=>s.id===makeupStudentId);
     const name = manualName.trim() || student?.name;
     if(!name) return;
+    const targetDate = weekDate(makeupWeek);
     setSaving(true);
     try{
       await db.collection(COL_OVERRIDES).add({
-        date, day, start:hour, end:toTime(toMin(hour)+60),
+        date: targetDate, day, start:hour, end:toTime(toMin(hour)+60),
         kind:'makeup',
         studentId: manualName.trim() ? null : (student ? student.id : null),
         studentName: name,
@@ -2181,24 +2187,32 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
           </React.Fragment>
         )}
 
-        <div className="input-label" style={{marginTop:regularEntries.length>0?4:0}}>보강 수업 (이 시간)</div>
-        {makeupOverrides.length > 0 && makeupOverrides.map(mo=>(
-          <div className="list-item-row" key={mo.id} style={{cursor:'default'}}>
-            <div>
-              <div className="name" style={{color:'#2E6FE8'}}>{mo.studentName}</div>
-              <div className="meta">{mo.studentType==='exam'?'입시생':(mo.studentType==='hobby'?'취미생':'직접입력')} · {dateObj.getMonth()+1}월 {dateObj.getDate()}일 보강</div>
+        <div className="input-label" style={{marginTop:regularEntries.length>0?4:0}}>보강 수업</div>
+        {makeupOverrides.length > 0 && makeupOverrides.map(mo=>{
+          const md = new Date(mo.date+'T00:00:00');
+          return (
+            <div className="list-item-row" key={mo.id} style={{cursor:'default'}}>
+              <div>
+                <div className="name" style={{color:'#2E6FE8'}}>{mo.studentName}</div>
+                <div className="meta">{mo.studentType==='exam'?'입시생':(mo.studentType==='hobby'?'취미생':'직접입력')} · {md.getMonth()+1}월 {md.getDate()}일 보강</div>
+              </div>
+              <button className="btn btn-danger btn-sm" disabled={saving} onClick={()=>removeMakeup(mo)}>삭제</button>
             </div>
-            <button className="btn btn-danger btn-sm" disabled={saving} onClick={()=>removeMakeup(mo)}>삭제</button>
-          </div>
-        ))}
-        <select className="input" value={makeupStudentId} onChange={e=>{setMakeupStudentId(e.target.value); setManualName('');}} style={{marginTop:makeupOverrides.length?10:6,marginBottom:10}}>
+          );
+        })}
+        <div className="toggle-row" style={{marginTop:makeupOverrides.length?10:6,marginBottom:10}}>
+          {WEEK_LABELS.map((label,off)=>(
+            <div key={off} className={"toggle-opt"+(makeupWeek===off?' active':'')} onClick={()=>setMakeupWeek(off)}>{label}</div>
+          ))}
+        </div>
+        <select className="input" value={makeupStudentId} onChange={e=>{setMakeupStudentId(e.target.value); setManualName('');}} style={{marginBottom:10}}>
           <option value="">보강 학생 선택 (목록에서)</option>
           {students.map(s=><option key={s.id} value={s.id}>{s.name} ({s.type==='exam'?'입시':'취미'})</option>)}
         </select>
         <div style={{textAlign:'center',fontSize:11,color:'var(--text-faint)',margin:'2px 0 8px'}}>또는</div>
         <input className="input" placeholder="이름 직접 입력 (목록에 없는 경우)" value={manualName} onChange={e=>{setManualName(e.target.value); setMakeupStudentId('');}} style={{marginBottom:10}} />
         <button className="btn" disabled={saving || (!makeupStudentId && !manualName.trim())} onClick={addMakeup} style={{marginBottom:20}}>
-          {dateObj.getMonth()+1}월 {dateObj.getDate()}일 {hourLabel12(hour)} 보강으로 지정
+          {(()=>{ const d = new Date(weekDate(makeupWeek)+'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일`; })()} {hourLabel12(hour)} 보강으로 지정
         </button>
 
         <div className="input-label">메모</div>
