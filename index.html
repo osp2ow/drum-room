@@ -178,6 +178,17 @@
 
   .admin-link{text-align:center;margin-top:22px;font-size:12px;color:var(--text-faint);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
 
+  .reserve-sheet{
+    position:fixed;bottom:calc(64px + var(--safe-b));left:50%;transform:translateX(-50%);
+    width:100%;max-width:480px;background:var(--surface);
+    border-top:1px solid var(--border);border-radius:20px 20px 0 0;
+    padding:16px 20px calc(14px + var(--safe-b));
+    box-shadow:0 -8px 24px rgba(20,40,38,0.14);
+    z-index:35;max-height:44vh;display:flex;flex-direction:column;
+  }
+  .reserve-sheet-title{font-family:var(--font-display);font-weight:700;font-size:14.5px;margin-bottom:8px;flex-shrink:0;}
+  .reserve-sheet-list{overflow-y:auto;margin-bottom:4px;}
+
   .tabbar{
     position:fixed;bottom:0;left:50%;transform:translateX(-50%);
     width:100%;max-width:480px;
@@ -287,6 +298,8 @@
   }
   .status-badge.open{background:var(--brass-soft);color:var(--brass-bright);}
   .status-badge.full{background:var(--rec-soft);color:#C7383C;}
+  .free-chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .free-chip{background:var(--brass-soft);color:var(--brass-bright);font-size:11px;font-weight:700;padding:5px 10px;border-radius:100px;white-space:nowrap;}
 
   .timetable-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:16px;background:var(--surface);margin-bottom:14px;}
   .timetable{border-collapse:collapse;width:100%;table-layout:fixed;}
@@ -1160,7 +1173,7 @@ function ReserveTab({ student, blocks }){
   const upcoming = dayReservations.filter(r=>r.studentId===student.id).sort((a,b)=> toMin(a.start)-toMin(b.start));
 
   return (
-    <div className="screen">
+    <div className="screen" style={draftRuns.length>0 ? {paddingBottom:'46vh'} : {}}>
       <div className="eyebrow">PRACTICE ROOM</div>
       <h1 className="page-title">연습실 예약</h1>
       <p className="page-sub">{student.type==='exam' ? '입시생: 하루 최대 3시간, 한 방 2시간 연속 후 1시간 휴식 또는 다른방으로 이어서 사용' : '취미생: 하루 최대 1시간'}</p>
@@ -1246,25 +1259,26 @@ function ReserveTab({ student, blocks }){
                 </div>
               </React.Fragment>
             )}
-            <p style={{fontSize:11.5,color:'var(--text-faint)',marginTop:10,marginBottom:0,lineHeight:1.5}}>칸을 눌러 여러 시간을 한 번에 선택할 수 있어요. 다른 방 탭으로 이동해도 선택은 유지돼요.</p>
           </div>
 
           {draftRuns.length > 0 && (
-            <div className="card">
-              <div className="card-title">선택한 예약</div>
-              {draftRuns.map((run,i)=>(
-                <div className="res-row" key={i}>
-                  <div style={{display:'flex',alignItems:'center'}}>
-                    <div className="room-badge">{roomLabel(run.room)}</div>
-                    <div className="res-time">{run.start} – {run.end}</div>
+            <div className="reserve-sheet">
+              <div className="reserve-sheet-title">선택한 예약</div>
+              <div className="reserve-sheet-list">
+                {draftRuns.map((run,i)=>(
+                  <div className="res-row" key={i}>
+                    <div style={{display:'flex',alignItems:'center'}}>
+                      <div className="room-badge">{roomLabel(run.room)}</div>
+                      <div className="res-time">{run.start} – {run.end}</div>
+                    </div>
+                    <div className="cancel-x" onClick={()=>setDraftSlots(prev=>prev.filter(sl=>!(sl.room===run.room && toMin(sl.time)>=toMin(run.start) && toMin(sl.time)<toMin(run.end))))}>✕</div>
                   </div>
-                  <div className="cancel-x" onClick={()=>setDraftSlots(prev=>prev.filter(sl=>!(sl.room===run.room && toMin(sl.time)>=toMin(run.start) && toMin(sl.time)<toMin(run.end))))}>✕</div>
-                </div>
-              ))}
+                ))}
+              </div>
 
-              {msg && <div className={msg.startsWith('✅')?'info-box':'error-box'} style={{marginTop:6}}>{msg}</div>}
+              {msg && <div className={msg.startsWith('✅')?'info-box':'error-box'} style={{marginTop:2,marginBottom:8}}>{msg}</div>}
 
-              <button className="btn" style={{marginTop:10}} disabled={submitting} onClick={submitAll}>
+              <button className="btn" disabled={submitting} onClick={submitAll}>
                 {submitting ? '예약 중...' : '선택한 시간 예약하기'}
               </button>
             </div>
@@ -1398,8 +1412,11 @@ function StatusTab({ student, blocks }){
     return ()=>unsub();
   }, [todayStr]);
 
+  const nowMin = (()=>{ const n = new Date(); return n.getHours()*60 + n.getMinutes(); })();
+
   function slotStatus(room, time){
     const s = toMin(time), e = s + 30;
+    if(s < nowMin) return 'past';
     const booked = dayReservations.some(r => Number(r.room)===room && toMin(r.start)<e && s<toMin(r.end));
     if(booked) return 'other';
     const closed = blocks.some(b => Number(b.room)===room && b.day===todayDow && toMin(b.start)<e && s<toMin(b.end));
@@ -1410,7 +1427,8 @@ function StatusTab({ student, blocks }){
   const roomStats = availableRooms.map(r=>{
     const total = slots.length;
     const takenCount = slots.filter(t=>slotStatus(r,t)!=='free').length;
-    return { room:r, total, takenCount, isFull: total>0 && takenCount>=total };
+    const freeSlots = slots.filter(t=>slotStatus(r,t)==='free');
+    return { room:r, total, takenCount, freeSlots, isFull: total>0 && takenCount>=total };
   });
   const currentStat = roomStats.find(s=>s.room===selRoom);
 
@@ -1438,8 +1456,15 @@ function StatusTab({ student, blocks }){
             {loading ? <div className="loading-spin"/> : (
               <React.Fragment>
                 <div className={"status-badge "+(currentStat.isFull?'full':'open')}>
-                  {currentStat.isFull ? '오늘 예약 마감' : `${currentStat.total-currentStat.takenCount}칸 비어있음`}
+                  {currentStat.isFull ? '오늘 예약 마감' : `${currentStat.freeSlots.length}칸 비어있음`}
                 </div>
+                {!currentStat.isFull && currentStat.freeSlots.length > 0 && (
+                  <div className="free-chip-row">
+                    {currentStat.freeSlots.map(t=>(
+                      <span key={t} className="free-chip">{t} 비어있음</span>
+                    ))}
+                  </div>
+                )}
                 <div className="slot-grid" style={{marginTop:14}}>
                   {slots.map(t=>{
                     const st = slotStatus(selRoom, t);
