@@ -532,8 +532,9 @@ function canAddSlot(type, existingMySlots, room, time){
   while(i > 0 && times[i]-times[i-1] === 30){ runLen++; i--; }
   while(j < times.length-1 && times[j+1]-times[j] === 30){ runLen++; j++; }
   if(runLen > 4) return false;
-  if(i > 0 && (times[i]-times[i-1]) < MIN_REST_SLOTS*30) return false;
-  if(j < times.length-1 && (times[j+1]-times[j]) < MIN_REST_SLOTS*30) return false;
+  // 실제 휴식 시간 = 다음 슬롯 시작 - (이전 슬롯 시작 + 30분)
+  if(i > 0 && (times[i]-times[i-1]-30) < MIN_REST_SLOTS*30) return false;
+  if(j < times.length-1 && (times[j+1]-times[j]-30) < MIN_REST_SLOTS*30) return false;
   return true;
 }
 
