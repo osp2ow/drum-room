@@ -198,10 +198,13 @@
     background:linear-gradient(135deg, var(--brass), var(--brass-bright));
     border-radius:16px;padding:14px 18px;margin-bottom:14px;color:#FFFFFF;
     box-shadow:0 6px 14px rgba(47,191,175,0.25);
-    display:flex;align-items:center;justify-content:space-between;gap:10px;
   }
+  .hero-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
   .hero-name{font-family:var(--font-display);font-size:15.5px;font-weight:800;letter-spacing:-0.01em;}
   .hero-sub{font-size:11.5px;color:rgba(255,255,255,0.9);font-weight:700;flex-shrink:0;}
+  .hero-schedule{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .hero-schedule-chip{background:rgba(255,255,255,0.22);color:#FFFFFF;font-size:11px;font-weight:700;padding:4px 10px;border-radius:100px;white-space:nowrap;}
+  .hero-schedule-empty{font-size:11.5px;color:rgba(255,255,255,0.82);margin-top:8px;display:block;}
 
   .notice-banner{
     display:flex;gap:9px;align-items:flex-start;
@@ -724,7 +727,6 @@ function TabBar({ tabs, active, onChange }){
    STUDENT: HOME TAB
    ============================================================ */
 function HomeTab({ student, notices }){
-  const todayDow = new Date().getDay();
   const schedule = student.schedule || [];
   const latestNotice = notices[0];
   const [myReservations, setMyReservations] = useState([]);
@@ -764,8 +766,19 @@ function HomeTab({ student, notices }){
       )}
 
       <div className="hero-card">
-        <div className="hero-name">{student.name}님, 안녕하세요 🥁</div>
-        <div className="hero-sub">{student.type === 'exam' ? '입시생' : '취미생'}</div>
+        <div className="hero-top">
+          <div className="hero-name">{student.name}님, 안녕하세요 🥁</div>
+          <div className="hero-sub">{student.type === 'exam' ? '입시생' : '취미생'}</div>
+        </div>
+        {schedule.length === 0 ? (
+          <span className="hero-schedule-empty">등록된 수업시간이 없어요. 원장님께 문의해주세요.</span>
+        ) : (
+          <div className="hero-schedule">
+            {schedule.map((s,i)=>(
+              <span key={i} className="hero-schedule-chip">{s.day} {s.start}–{s.end}</span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card today-highlight">
@@ -780,24 +793,6 @@ function HomeTab({ student, notices }){
                 <div className="res-date">{fmtKDate(new Date(r.date+'T00:00:00'))}</div>
                 <div className="res-time">{r.start} – {r.end}</div>
               </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="card">
-        <div className="card-title">📋 내 수업시간</div>
-        {schedule.length === 0 ? (
-          <div className="empty-state">
-            <div className="icon">🗓️</div>
-            <p>아직 등록된 수업시간이 없어요.<br/>원장님께 문의해주세요.</p>
-          </div>
-        ) : schedule.map((s,i)=>(
-          <div className="schedule-row" key={i}>
-            <div className={"schedule-day"+(DOW.indexOf(s.day)===todayDow?' today':'')}>{s.day}</div>
-            <div>
-              <div className="schedule-time">{s.start} – {s.end}</div>
-              <div className="schedule-sub">{s.day}요일 레슨</div>
             </div>
           </div>
         ))}
@@ -974,7 +969,7 @@ function ReserveTab({ student, blocks }){
     <div className="screen">
       <div className="eyebrow">PRACTICE ROOM</div>
       <h1 className="page-title">연습실 예약</h1>
-      <p className="page-sub">{student.type==='exam' ? '입시생: 1일 최대 3시간(6칸). 한 방에서 최대 2시간(4칸) 연속 사용 후엔 같은 방은 1시간 휴식, 다른 방은 언제든 이용 가능해요.' : '취미생: 1일 최대 1시간(2칸)'}</p>
+      <p className="page-sub">{student.type==='exam' ? '입시생: 하루 최대 3시간, 한 방 2시간 연속 후 1시간 휴식 또는 다른방으로 이어서 사용' : '취미생: 하루 최대 1시간'}</p>
 
       <div className="date-scroll-row">
         <div className="date-scroll">
