@@ -2148,26 +2148,32 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
         {regularEntries.length > 0 && (
           <React.Fragment>
             <div className="input-label">정규 수업 · 결석 예약</div>
-            {regularEntries.map(en=>(
-              <div key={en.id} style={{marginBottom:16}}>
-                <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{en.name}</div>
-                <div style={{fontSize:11.5,color:'var(--text-faint)',marginBottom:8}}>{en.type==='exam'?'입시생':'취미생'}</div>
-                <div className="toggle-row" style={{gap:6}}>
-                  {[0,1,2].map(off=>{
-                    const td = weekDate(off);
-                    const isAbsent = overrides.some(o=>o.kind==='absence' && o.studentId===en.id && o.date===td && o.start===hour);
-                    return (
-                      <div key={off}
-                        className={"toggle-opt"+(isAbsent?' active':'')}
-                        style={Object.assign({fontSize:12,padding:'10px 4px'}, isAbsent?{borderColor:'var(--rec)',background:'var(--rec-soft)',color:'var(--rec)',fontWeight:700}:{})}
-                        onClick={()=>!saving && toggleAbsence(en, td)}>
-                        {isAbsent ? WEEK_LABELS[off]+' 결석' : WEEK_LABELS[off]}
-                      </div>
-                    );
-                  })}
+            {regularEntries.map(en=>{
+              const activeOffs = [0,1,2].filter(off=> overrides.some(o=>o.kind==='absence' && o.studentId===en.id && o.date===weekDate(off) && o.start===hour));
+              const dateLabels = activeOffs.map(off=>{ const d = new Date(weekDate(off)+'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일`; });
+              return (
+                <div key={en.id} style={{marginBottom:16}}>
+                  <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{en.name}</div>
+                  <div style={{fontSize:11.5,color: dateLabels.length ? 'var(--rec)' : 'var(--text-faint)', fontWeight: dateLabels.length?700:400, marginBottom:8}}>
+                    {dateLabels.length ? dateLabels.join(', ')+' 결석' : '결석 예정 없음'}
+                  </div>
+                  <div className="toggle-row" style={{gap:6}}>
+                    {[0,1,2].map(off=>{
+                      const td = weekDate(off);
+                      const isAbsent = overrides.some(o=>o.kind==='absence' && o.studentId===en.id && o.date===td && o.start===hour);
+                      return (
+                        <div key={off}
+                          className={"toggle-opt"+(isAbsent?' active':'')}
+                          style={Object.assign({fontSize:12,padding:'10px 4px'}, isAbsent?{borderColor:'var(--rec)',background:'var(--rec-soft)',color:'var(--rec)',fontWeight:700}:{})}
+                          onClick={()=>!saving && toggleAbsence(en, td)}>
+                          {WEEK_LABELS[off]} 결석
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </React.Fragment>
         )}
 
@@ -2193,7 +2199,7 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
 
         <div className="input-label">메모</div>
         <textarea className="input" rows="3" placeholder="이 시간에 대한 메모를 남겨보세요" value={noteText} onChange={e=>setNoteText(e.target.value)} style={{resize:'vertical',marginBottom:8}} />
-        <button className="btn btn-ghost btn-sm" disabled={saving} onClick={saveNote} style={{width:'100%'}}>{noteSaved ? '✓ 저장됨' : '메모 저장'}</button>
+        <button className="btn btn-ghost btn-sm" disabled={saving} onClick={saveNote} style={{width:'100%'}}>{noteSaved ? '✓ 저장됨' : '저장'}</button>
       </div>
     </div>
   );
