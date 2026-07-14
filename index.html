@@ -949,6 +949,7 @@ function HomeTab({ student, notices, onGoReserve }){
 
 function ManageReservationsModal({ student, onClose, onGoReserve }){
   const [myReservations, setMyReservations] = useState([]);
+  const scrollRef = useHScroll();
 
   useEffect(()=>{
     const unsub = db.collection(COL_RESERVATIONS).where('studentId','==',student.id).onSnapshot(snap=>{
@@ -957,11 +958,20 @@ function ManageReservationsModal({ student, onClose, onGoReserve }){
     return ()=>unsub();
   }, [student.id]);
 
+  const weekDates = useMemo(()=>{
+    const arr = []; let d = new Date(); d.setHours(0,0,0,0);
+    for(let i=0;i<=7;i++){ const cand = addDays(d,i); if(cand.getDay()!==0) arr.push(cand); }
+    return arr;
+  }, []);
   const todayStr = fmtDate(new Date());
-  const maxStr = fmtDate(addDays(new Date(),7));
+  const maxStr = fmtDate(weekDates[weekDates.length-1]);
+  const [selDay, setSelDay] = useState(todayStr);
+
   const upcoming = myReservations
     .filter(r=> r.date >= todayStr && r.date <= maxStr)
     .sort((a,b)=> a.date===b.date ? toMin(a.start)-toMin(b.start) : (a.date<b.date?-1:1));
+  const reservedDates = new Set(upcoming.map(r=>r.date));
+  const selDayReservations = upcoming.filter(r=>r.date===selDay).sort((a,b)=>toMin(a.start)-toMin(b.start));
 
   async function cancel(id){
     if(!window.confirm('이 예약을 취소할까요?')) return;
@@ -977,9 +987,24 @@ function ManageReservationsModal({ student, onClose, onGoReserve }){
           <div className="icon-btn" onClick={onClose}>✕</div>
         </div>
         <p style={{fontSize:12.5,color:'var(--text-muted)',marginTop:0,marginBottom:16,lineHeight:1.6}}>시간을 바꾸고 싶으면 먼저 취소한 뒤 새로 예약해주세요.</p>
-        {upcoming.length === 0 ? (
-          <div className="empty-state"><div className="icon">🎫</div><p>예정된 예약이 없어요.</p></div>
-        ) : upcoming.map(r=>(
+
+        <div className="date-scroll" ref={scrollRef} style={{marginBottom:14}}>
+          {weekDates.map(d=>{
+            const ds = fmtDate(d);
+            const isToday = ds === todayStr;
+            return (
+              <div key={ds} className={"date-chip"+(ds===selDay?' active':'')+(isToday?' today':'')} onClick={()=>setSelDay(ds)}>
+                <div className="dow">{DOW[d.getDay()]}</div>
+                <div className="num">{d.getDate()}</div>
+                {reservedDates.has(ds) && <div className={"res-dot"+(ds===selDay?' on-active':'')}/>}
+              </div>
+            );
+          })}
+        </div>
+
+        {selDayReservations.length === 0 ? (
+          <div className="empty-state"><div className="icon">🎫</div><p>이 날 예정된 예약이 없어요.</p></div>
+        ) : selDayReservations.map(r=>(
           <div className="res-row" key={r.id}>
             <div style={{display:'flex',alignItems:'center'}}>
               <div className="room-badge">{roomFullLabel(r.room)}</div>
@@ -1028,6 +1053,15 @@ function ReserveTab({ student, blocks }){
   }, [todayKey]);
   const minDate = fmtDate(dates[0]);
   const maxDate = fmtDate(dates[dates.length-1]);
+
+  const [myAllReservations, setMyAllReservations] = useState([]);
+  useEffect(()=>{
+    const unsub = db.collection(COL_RESERVATIONS).where('studentId','==',student.id).onSnapshot(snap=>{
+      setMyAllReservations(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return ()=>unsub();
+  }, [student.id]);
+  const myReservedDates = useMemo(()=> new Set(myAllReservations.map(r=>r.date)), [myAllReservations]);
 
   useEffect(()=>{
     if(!availableRooms.includes(selRoom)) setSelRoom(availableRooms[0]);
@@ -1187,6 +1221,7 @@ function ReserveTab({ student, blocks }){
               <div key={ds} className={"date-chip"+(ds===selDate?' active':'')+(isToday?' today':'')} onClick={()=>setSelDate(ds)}>
                 <div className="dow">{DOW[d.getDay()]}</div>
                 <div className="num">{d.getDate()}</div>
+                {myReservedDates.has(ds) && <div className={"res-dot"+(ds===selDate?' on-active':'')}/>}
               </div>
             );
           })}
