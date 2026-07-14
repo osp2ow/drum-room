@@ -1971,18 +1971,20 @@ function AdminTimetableTab(){
   function cellData(dayIdx, hour){
     const day = DAYS[dayIdx];
     const date = weekDateStrs[dayIdx];
+    const nextDate = fmtDate(addDays(weekDates[dayIdx], 7));
     const regularEntries = findRegular(day, hour);
-    const absenceOverrides = overrides.filter(o=>o.kind==='absence' && o.date===date && o.start===hour);
+    const regularIds = regularEntries.map(en=>en.id);
+    const absenceOverrides = overrides.filter(o=> o.kind==='absence' && o.start===hour && (o.date===date || o.date===nextDate) && regularIds.includes(o.studentId));
     const makeupOverrides = overrides.filter(o=>o.kind==='makeup' && o.date===date && o.start===hour);
     const noteOverride = overrides.find(o=>o.kind==='note' && o.date===date && o.start===hour) || null;
-    return { day, dayIdx, date, hour, regularEntries, absenceOverrides, makeupOverrides, noteOverride };
+    return { day, dayIdx, date, nextDate, hour, regularEntries, absenceOverrides, makeupOverrides, noteOverride };
   }
 
   function cellClass(cell){
     if(cell.makeupOverrides.length>0) return 'tt-cell makeup';
     if(cell.regularEntries.length>0){
-      const allAbsent = cell.regularEntries.every(en=>cell.absenceOverrides.some(a=>a.studentId===en.id));
-      return allAbsent ? 'tt-cell absent' : 'tt-cell booked';
+      const anyAbsent = cell.regularEntries.some(en=>cell.absenceOverrides.some(a=>a.studentId===en.id));
+      return anyAbsent ? 'tt-cell absent' : 'tt-cell booked';
     }
     return 'tt-cell empty';
   }
@@ -2022,12 +2024,14 @@ function AdminTimetableTab(){
                   return (
                     <td key={i} className={cls} style={{cursor:'pointer'}} onClick={()=>setEditingCell(cell)}>
                       {cell.regularEntries.map(en=>{
-                        const absent = cell.absenceOverrides.some(a=>a.studentId===en.id);
+                        const absenceEntry = cell.absenceOverrides.find(a=>a.studentId===en.id);
+                        const absent = !!absenceEntry;
                         const col = (solidAbsent || solidMakeup) ? '#FFFFFF' : (absent ? 'var(--rec)' : undefined);
+                        const dateLabel = absent ? (()=>{ const d = new Date(absenceEntry.date+'T00:00:00'); return `${d.getMonth()+1}월${d.getDate()}일`; })() : null;
                         return (
                           <div key={en.id} style={{marginBottom:2}}>
                             <div className="tt-name" style={{color:col, textDecoration: absent?'line-through':'none'}}>{en.name}</div>
-                            <div className="tt-type" style={{color:col}}>{absent?'결석':(en.type==='exam'?'입시':'취미')}</div>
+                            <div className="tt-type" style={{color:col}}>{absent ? dateLabel : (en.type==='exam'?'입시':'취미')}</div>
                           </div>
                         );
                       })}
@@ -2068,7 +2072,7 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
 
   const dateObj = new Date(date+'T00:00:00');
   const dateLabel = `${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 (${day}) ${hourLabel12(hour)}`;
-  const WEEK_LABELS = ['이번주','다음주','다다음주'];
+  const WEEK_LABELS = ['이번주','다음주'];
 
   function weekDate(offset){
     return fmtDate(addDays(getMonday(offset), dayIdx));
@@ -2149,7 +2153,7 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
           <React.Fragment>
             <div className="input-label">정규 수업 · 결석 예약</div>
             {regularEntries.map(en=>{
-              const activeOffs = [0,1,2].filter(off=> overrides.some(o=>o.kind==='absence' && o.studentId===en.id && o.date===weekDate(off) && o.start===hour));
+              const activeOffs = [0,1].filter(off=> overrides.some(o=>o.kind==='absence' && o.studentId===en.id && o.date===weekDate(off) && o.start===hour));
               const dateLabels = activeOffs.map(off=>{ const d = new Date(weekDate(off)+'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일`; });
               return (
                 <div key={en.id} style={{marginBottom:16}}>
@@ -2158,7 +2162,7 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
                     {dateLabels.length ? dateLabels.join(', ')+' 결석' : '결석 예정 없음'}
                   </div>
                   <div className="toggle-row" style={{gap:6}}>
-                    {[0,1,2].map(off=>{
+                    {[0,1].map(off=>{
                       const td = weekDate(off);
                       const isAbsent = overrides.some(o=>o.kind==='absence' && o.studentId===en.id && o.date===td && o.start===hour);
                       return (
