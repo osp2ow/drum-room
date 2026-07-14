@@ -538,6 +538,43 @@ function canAddSlot(type, existingMySlots, room, time){
   return true;
 }
 
+function runLenEndingAt(times, endIdx){
+  let len = 1, k = endIdx;
+  while(k > 0 && times[k]-times[k-1] === 30){ len++; k--; }
+  return len;
+}
+function runLenStartingAt(times, startIdx){
+  let len = 1, k = startIdx;
+  while(k < times.length-1 && times[k+1]-times[k] === 30){ len++; k++; }
+  return len;
+}
+
+// 그리드에 '불가'로 보여주기 위한 완화된 버전: 아직 만들고 있는 중간 단계(연속 4칸을 다 채우기 전)에서는
+// 멀리 있는 칸을 미리 '불가'로 보여주지 않고, 실제로 2시간(4칸)을 다 채운 뒤에만 휴식 규칙을 적용해요.
+// (최종 저장 시에는 canAddSlot으로 다시 한번 정확하게 검증해요)
+function canAddSlotDisplay(type, existingMySlots, room, time){
+  const combined = existingMySlots.concat([{ room, time }]);
+  if(combined.length > dailyLimitSlots(type)) return false;
+  const times = combined.filter(s=>s.room===room).map(s=>toMin(s.time)).sort((a,b)=>a-b);
+  const target = toMin(time);
+  let idx = times.indexOf(target);
+  let runLen = 1, i = idx, j = idx;
+  while(i > 0 && times[i]-times[i-1] === 30){ runLen++; i--; }
+  while(j < times.length-1 && times[j+1]-times[j] === 30){ runLen++; j++; }
+  if(runLen > 4) return false;
+  if(i > 0){
+    const prevLen = runLenEndingAt(times, i-1);
+    const gap = times[i]-times[i-1]-30;
+    if(prevLen >= 4 && gap < MIN_REST_SLOTS*30) return false;
+  }
+  if(j < times.length-1){
+    const nextLen = runLenStartingAt(times, j+1);
+    const gap = times[j+1]-times[j]-30;
+    if(nextLen >= 4 && gap < MIN_REST_SLOTS*30) return false;
+  }
+  return true;
+}
+
 /* ============================================================
    ICONS
    ============================================================ */
@@ -890,7 +927,7 @@ function ReserveTab({ student, blocks }){
     if(isClosed) return 'closed';
     if(existingSlots.some(sl=>sl.room===room && sl.time===time)) return 'mine';
     if(draftSlots.some(sl=>sl.room===room && sl.time===time)) return 'selected';
-    const ok = canAddSlot(student.type, existingSlots.concat(draftSlots), room, time);
+    const ok = canAddSlotDisplay(student.type, existingSlots.concat(draftSlots), room, time);
     return ok ? 'free' : 'blocked';
   }
 
