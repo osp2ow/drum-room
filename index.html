@@ -940,8 +940,32 @@ function ReserveTab({ student, blocks }){
     const s = toMin(time), e = s + 30;
     const res = dayReservations.find(r => Number(r.room)===room && r.studentId===student.id && toMin(r.start)<e && s<toMin(r.end));
     if(!res) return;
-    if(!window.confirm(`${res.start} – ${res.end} 예약을 취소하시겠습니까?`)) return;
-    await db.collection(COL_RESERVATIONS).doc(res.id).delete();
+    if(!window.confirm(`${time} – ${toTime(e)} 예약을 취소하시겠습니까?`)) return;
+    try{
+      const resStart = toMin(res.start), resEnd = toMin(res.end);
+      const ref = db.collection(COL_RESERVATIONS).doc(res.id);
+      if(resStart === s && resEnd === e){
+        // 예약 전체가 이 30분짜리 하나뿐이면 통째로 삭제
+        await ref.delete();
+      } else if(resStart === s){
+        // 맨 앞 30분만 취소 -> 시작 시간을 뒤로 당김
+        await ref.update({ start: toTime(e) });
+      } else if(resEnd === e){
+        // 맨 뒤 30분만 취소 -> 종료 시간을 앞으로 당김
+        await ref.update({ end: toTime(s) });
+      } else {
+        // 중간 30분 취소 -> 앞부분은 줄이고 뒷부분은 새 예약으로 분리
+        const batch = db.batch();
+        batch.update(ref, { end: toTime(s) });
+        const newRef = db.collection(COL_RESERVATIONS).doc();
+        batch.set(newRef, {
+          studentId: res.studentId, studentName: res.studentName, studentType: res.studentType,
+          room: res.room, date: res.date, start: toTime(e), end: res.end,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        await batch.commit();
+      }
+    }catch(err){ alert('취소 중 오류가 발생했어요. 다시 시도해주세요.'); }
   }
 
   function toggleSlot(room, time){
