@@ -226,13 +226,13 @@
 
   .date-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;}
   .date-chip{
-    flex-shrink:0;width:62px;padding:13px 0;border-radius:14px;text-align:center;
+    flex-shrink:0;width:58px;padding:11px 0;border-radius:13px;text-align:center;
     background:var(--surface);border:1px solid var(--border);cursor:pointer;
   }
   .date-chip.active{background:var(--brass);border-color:var(--brass);}
-  .date-chip .dow{font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text-muted);}
+  .date-chip .dow{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text-muted);}
   .date-chip.active .dow{color:rgba(255,255,255,0.9);}
-  .date-chip .num{font-family:var(--font-display);font-size:20px;font-weight:700;margin-top:3px;}
+  .date-chip .num{font-family:var(--font-display);font-size:17px;font-weight:700;margin-top:2px;}
   .date-chip.active .num{color:#FFFFFF;}
   .date-chip.today .num::after{content:'';display:block;width:4px;height:4px;border-radius:50%;background:var(--rec);margin:3px auto 0;}
   .date-chip.active.today .num::after{background:#FFFFFF;}
@@ -552,10 +552,12 @@ function runLenStartingAt(times, startIdx){
 // 그리드에 '불가'로 보여주기 위한 완화된 버전: 아직 만들고 있는 중간 단계(연속 4칸을 다 채우기 전)에서는
 // 멀리 있는 칸을 미리 '불가'로 보여주지 않고, 실제로 2시간(4칸)을 다 채운 뒤에만 휴식 규칙을 적용해요.
 // (최종 저장 시에는 canAddSlot으로 다시 한번 정확하게 검증해요)
-function canAddSlotDisplay(type, existingMySlots, room, time){
-  const combined = existingMySlots.concat([{ room, time }]);
-  if(combined.length > dailyLimitSlots(type)) return false;
-  const times = combined.filter(s=>s.room===room).map(s=>toMin(s.time)).sort((a,b)=>a-b);
+function canAddSlotDisplay(type, existingMySlots, draftMySlots, room, time){
+  const totalCount = existingMySlots.length + draftMySlots.length + 1;
+  if(totalCount > dailyLimitSlots(type)) return false;
+  // 연속 사용/휴식 규칙은 지금 새로 선택 중인 칸(draft)들끼리만 계산해요.
+  // 이미 확정된 예약(existingMySlots)과 굳이 이어붙여서 앞칸까지 막을 필요는 없어요.
+  const times = draftMySlots.filter(s=>s.room===room).map(s=>toMin(s.time)).concat([toMin(time)]).sort((a,b)=>a-b);
   const target = toMin(time);
   let idx = times.indexOf(target);
   let runLen = 1, i = idx, j = idx;
@@ -927,7 +929,7 @@ function ReserveTab({ student, blocks }){
     if(isClosed) return 'closed';
     if(existingSlots.some(sl=>sl.room===room && sl.time===time)) return 'mine';
     if(draftSlots.some(sl=>sl.room===room && sl.time===time)) return 'selected';
-    const ok = canAddSlotDisplay(student.type, existingSlots.concat(draftSlots), room, time);
+    const ok = canAddSlotDisplay(student.type, existingSlots, draftSlots, room, time);
     return ok ? 'free' : 'blocked';
   }
 
