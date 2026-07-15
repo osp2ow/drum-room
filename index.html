@@ -2352,7 +2352,6 @@ function AdminTimetableTab(){
 function SlotOverrideModal({ cell, students, overrides, onClose }){
   const { day, dayIdx, hour, date } = cell;
   const [saving, setSaving] = useState(false);
-  const [makeupStudentId, setMakeupStudentId] = useState('');
   const [manualName, setManualName] = useState('');
   const [makeupWeek, setMakeupWeek] = useState(0);
   const [noteText, setNoteText] = useState(cell.noteOverride?.note || '');
@@ -2389,8 +2388,7 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
   }
 
   async function addMakeup(){
-    const student = students.find(s=>s.id===makeupStudentId);
-    const name = manualName.trim() || student?.name;
+    const name = manualName.trim();
     if(!name) return;
     const targetDate = weekDate(makeupWeek);
     setSaving(true);
@@ -2398,12 +2396,12 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
       await db.collection(COL_OVERRIDES).add({
         date: targetDate, day, start:hour, end:toTime(toMin(hour)+60),
         kind:'makeup',
-        studentId: manualName.trim() ? null : (student ? student.id : null),
+        studentId: null,
         studentName: name,
-        studentType: manualName.trim() ? null : (student ? student.type : null),
+        studentType: null,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      setMakeupStudentId(''); setManualName('');
+      setManualName('');
     }catch(e){ alert('처리 중 오류가 발생했어요. 다시 시도해주세요.'); }
     setSaving(false);
   }
@@ -2491,13 +2489,8 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
             <div key={off} className={"toggle-opt"+(makeupWeek===off?' active':'')} onClick={()=>setMakeupWeek(off)}>{label}</div>
           ))}
         </div>
-        <select className="input" value={makeupStudentId} onChange={e=>{setMakeupStudentId(e.target.value); setManualName('');}} style={{marginBottom:10}}>
-          <option value="">보강 학생 선택 (목록에서)</option>
-          {students.map(s=><option key={s.id} value={s.id}>{s.name} ({s.type==='exam'?'입시':'취미'})</option>)}
-        </select>
-        <div style={{textAlign:'center',fontSize:11,color:'var(--text-faint)',margin:'2px 0 8px'}}>또는</div>
-        <input className="input" placeholder="이름 직접 입력 (목록에 없는 경우)" value={manualName} onChange={e=>{setManualName(e.target.value); setMakeupStudentId('');}} style={{marginBottom:10}} />
-        <button className="btn" disabled={saving || (!makeupStudentId && !manualName.trim())} onClick={addMakeup} style={{marginBottom:20}}>
+        <input className="input" placeholder="보강 학생 이름 입력" value={manualName} onChange={e=>setManualName(e.target.value)} style={{marginBottom:10}} />
+        <button className="btn" disabled={saving || !manualName.trim()} onClick={addMakeup} style={{marginBottom:20}}>
           {(()=>{ const d = new Date(weekDate(makeupWeek)+'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일`; })()} {hourLabel12(hour)} 보강으로 지정
         </button>
 
