@@ -1089,7 +1089,7 @@ function ReserveTab({ student, blocks }){
 
   function slotState(room, time){
     const s = toMin(time), e = s + 30;
-    if(isToday && s < nowMin) return 'past';
+    if(isToday && e <= nowMin) return 'past';
     const isOther = dayReservations.some(r => Number(r.room)===room && r.studentId!==student.id && toMin(r.start)<e && s<toMin(r.end));
     if(isOther) return 'other';
     const isClosed = blocks.some(b => Number(b.room)===room && b.day===dow && toMin(b.start)<e && s<toMin(b.end));
@@ -1452,7 +1452,7 @@ function StatusTab({ student, blocks }){
 
   function slotStatus(room, time){
     const s = toMin(time), e = s + 30;
-    if(s < nowMin) return 'past';
+    if(e <= nowMin) return 'past';
     const booked = dayReservations.some(r => Number(r.room)===room && toMin(r.start)<e && s<toMin(r.end));
     if(booked) return 'other';
     const closed = blocks.some(b => Number(b.room)===room && b.day===todayDow && toMin(b.start)<e && s<toMin(b.end));
