@@ -320,7 +320,7 @@
   .tt-cell.empty{color:var(--text-faint);font-size:11px;}
   .tt-cell.booked{background:var(--brass-soft);cursor:pointer;}
   .tt-cell.absent{background:var(--rec);cursor:pointer;}
-  .tt-cell.taken{background:var(--surface-3);border-bottom:1.5px solid var(--text-faint);border-right:1.5px solid var(--text-faint);}
+  .tt-cell.taken{background:var(--surface-3);border:2px solid var(--text-muted);}
   .tt-cell.makeup{background:#2E6FE8;cursor:pointer;}
   .tt-cell.booked:active{filter:brightness(0.95);}
   .tt-name{font-size:12px;font-weight:800;color:var(--brass-bright);line-height:1.3;}
@@ -1153,51 +1153,60 @@ function ReserveTab({ student, blocks }){
     if(draftSlots.length===0) return;
     setSubmitting(true); setMsg('');
     try{
-      const fresh = await db.collection(COL_RESERVATIONS).where('date','==',selDate).get();
-      const freshList = fresh.docs.map(d=>({id:d.id, ...d.data()}));
-      const conflict = draftSlots.some(sl=>{
-        const s = toMin(sl.time), e = s+30;
-        return freshList.some(r=>r.studentId!==student.id && Number(r.room)===sl.room && toMin(r.start)<e && s<toMin(r.end));
-      });
-      if(conflict){ setMsg('방금 다른 학생이 예약해서 시간이 겹쳐요. 선택을 확인해주세요.'); setSubmitting(false); return; }
+      await db.runTransaction(async (transaction)=>{
+        // 트랜잭션 안에서 다시 읽어와서, 커밋 직전까지 이 쿼리 결과가 바뀌면
+        // Firestore가 자동으로 감지해서 트랜잭션을 재시도(또는 실패)시켜요.
+        const q = db.collection(COL_RESERVATIONS).where('date','==',selDate);
+        const snap = await transaction.get(q);
+        const freshList = snap.docs.map(d=>({id:d.id, ...d.data()}));
 
-      const blockConflict = draftSlots.some(sl=>{
-        const s = toMin(sl.time), e = s+30;
-        return blocks.some(b=> Number(b.room)===sl.room && b.day===dow && toMin(b.start)<e && s<toMin(b.end));
-      });
-      if(blockConflict){ setMsg('선택한 시간 중 예약이 막혀있는 시간이 포함되어 있어요. 선택을 다시 확인해주세요.'); setSubmitting(false); return; }
+        const conflict = draftSlots.some(sl=>{
+          const s = toMin(sl.time), e = s+30;
+          return freshList.some(r=>r.studentId!==student.id && Number(r.room)===sl.room && toMin(r.start)<e && s<toMin(r.end));
+        });
+        if(conflict) throw new Error('CONFLICT_OTHER');
 
-      const freshMineAll = expandToSlots(freshList.filter(r=>r.studentId===student.id));
-      const dupConflict = draftSlots.some(sl=>
-        freshMineAll.some(m=>m.time===sl.time && m.room!==sl.room) ||
-        draftSlots.some(other=>other!==sl && other.time===sl.time && other.room!==sl.room)
-      );
-      if(dupConflict){ setMsg('같은 시간에 다른 방과 중복 예약된 시간이 있어요. 선택을 다시 확인해주세요.'); setSubmitting(false); return; }
+        const blockConflict = draftSlots.some(sl=>{
+          const s = toMin(sl.time), e = s+30;
+          return blocks.some(b=> Number(b.room)===sl.room && b.day===dow && toMin(b.start)<e && s<toMin(b.end));
+        });
+        if(blockConflict) throw new Error('CONFLICT_BLOCK');
 
-      const freshExisting = expandToSlots(freshList.filter(r=>r.studentId===student.id));
-      let running = freshExisting.slice();
-      for(const sl of draftSlots){
-        if(!canAddSlot(student.type, running, sl.room, sl.time)){
-          setMsg('예약 규칙에 맞지 않는 시간이 포함되어 있어요. 선택을 다시 확인해주세요.');
-          setSubmitting(false);
-          return;
+        const freshMineAll = expandToSlots(freshList.filter(r=>r.studentId===student.id));
+        const dupConflict = draftSlots.some(sl=>
+          freshMineAll.some(m=>m.time===sl.time && m.room!==sl.room) ||
+          draftSlots.some(other=>other!==sl && other.time===sl.time && other.room!==sl.room)
+        );
+        if(dupConflict) throw new Error('CONFLICT_DUP');
+
+        let running = freshMineAll.slice();
+        for(const sl of draftSlots){
+          if(!canAddSlot(student.type, running, sl.room, sl.time)) throw new Error('CONFLICT_RULE');
+          running.push(sl);
         }
-        running.push(sl);
-      }
 
-      const batch = db.batch();
-      draftRuns.forEach(run=>{
-        const ref = db.collection(COL_RESERVATIONS).doc();
-        batch.set(ref, {
-          studentId: student.id, studentName: student.name, studentType: student.type,
-          room: run.room, date: selDate, start: run.start, end: run.end,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        // 검증을 통과한 경우에만, 같은 트랜잭션 안에서 실제로 저장해요.
+        draftRuns.forEach(run=>{
+          const ref = db.collection(COL_RESERVATIONS).doc();
+          transaction.set(ref, {
+            studentId: student.id, studentName: student.name, studentType: student.type,
+            room: run.room, date: selDate, start: run.start, end: run.end,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
         });
       });
-      await batch.commit();
+
       setDraftSlots([]);
       setMsg('✅ 예약이 완료됐어요!');
-    }catch(e){ setMsg('예약 중 오류가 발생했어요. 다시 시도해주세요.'); }
+    }catch(e){
+      const map = {
+        CONFLICT_OTHER: '방금 다른 학생이 예약해서 시간이 겹쳐요. 선택을 다시 확인해주세요.',
+        CONFLICT_BLOCK: '선택한 시간 중 예약이 막혀있는 시간이 포함되어 있어요. 선택을 다시 확인해주세요.',
+        CONFLICT_DUP: '같은 시간에 다른 방과 중복 예약된 시간이 있어요. 선택을 다시 확인해주세요.',
+        CONFLICT_RULE: '예약 규칙에 맞지 않는 시간이 포함되어 있어요. 선택을 다시 확인해주세요.',
+      };
+      setMsg(map[e.message] || '예약 중 오류가 발생했어요. 다시 시도해주세요.');
+    }
     setSubmitting(false);
   }
 
