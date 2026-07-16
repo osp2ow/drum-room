@@ -178,6 +178,14 @@
 
   .admin-link{text-align:center;margin-top:22px;font-size:12px;color:var(--text-faint);cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
 
+  .reserve-toast{
+    position:fixed;top:calc(16px + var(--safe-t));left:50%;transform:translateX(-50%);
+    background:var(--brass);color:#FFFFFF;font-family:var(--font-display);font-weight:700;font-size:14px;
+    padding:13px 22px;border-radius:100px;box-shadow:0 8px 22px rgba(47,191,175,0.35);
+    z-index:60;white-space:nowrap;animation:toastPop .25s ease;
+  }
+  @keyframes toastPop{from{opacity:0;transform:translateX(-50%) translateY(-10px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+
   .reserve-sheet{
     position:fixed;bottom:calc(64px + var(--safe-b));left:50%;transform:translateX(-50%);
     width:100%;max-width:480px;background:var(--surface);
@@ -1070,6 +1078,7 @@ function ReserveTab({ student, blocks }){
   const [draftSlots, setDraftSlots] = useState([]); // [{room,time}] 아직 저장 안 된 선택
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState('');
 
   const dateObj = useMemo(()=> new Date(selDate+'T00:00:00'), [selDate]);
   const hours = useMemo(()=> getOperatingHours(dateObj), [dateObj]);
@@ -1229,7 +1238,9 @@ function ReserveTab({ student, blocks }){
       });
       await batch.commit();
       setDraftSlots([]);
-      setMsg('✅ 예약이 완료됐어요!');
+      setMsg('');
+      setToast('✅ 예약이 완료됐어요!');
+      setTimeout(()=> setToast(''), 2500);
     }catch(e){
       console.error(e);
       setMsg('예약 중 오류가 발생했어요. 다시 시도해주세요.');
@@ -1246,6 +1257,7 @@ function ReserveTab({ student, blocks }){
 
   return (
     <div className="screen" style={draftRuns.length>0 ? {paddingBottom:'46vh'} : {}}>
+      {toast && <div className="reserve-toast">{toast}</div>}
       <div className="eyebrow">PRACTICE ROOM</div>
       <h1 className="page-title">연습실 예약</h1>
       <p className="page-sub">{student.type==='exam' ? '입시생: 하루 최대 3시간, 한 방 2시간 연속 후 1시간 휴식 또는 다른방으로 이어서 사용' : '취미생: 하루 최대 1시간'}</p>
