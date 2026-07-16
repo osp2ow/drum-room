@@ -1713,12 +1713,11 @@ function MyTab({ student, notices, onLogout }){
   const [showStats, setShowStats] = useState(false);
 
   useEffect(()=>{
-    if(student.type !== 'exam') return;
     const unsub = db.collection(COL_RESERVATIONS).where('studentId','==',student.id).onSnapshot(snap=>{
       setExamReservations(snap.docs.map(d=>d.data()));
     });
     return ()=>unsub();
-  }, [student.id, student.type]);
+  }, [student.id]);
 
   const now = new Date();
   const thisMonth = now.getMonth() + 1;
@@ -1743,7 +1742,7 @@ function MyTab({ student, notices, onLogout }){
         </div>
       </div>
 
-      {student.type==='exam' && (
+      {(
         <div className="card" onClick={()=>setShowStats(true)} style={{cursor:'pointer'}}>
           <div className="card-title">📊 이번달 연습시간</div>
           <div style={{fontFamily:'var(--font-body)',fontWeight:500,fontSize:15,color:'var(--brass-bright)'}}>
@@ -2995,13 +2994,13 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
               ))}
             </div>
           ) : (
-            <p style={{fontSize:11.5,color:'var(--text-faint)',marginTop:0,marginBottom:10,lineHeight:1.5}}>일치하는 학생이 없어요. 이대로 등록하면 이름만 기록되고, 그 학생 홈 화면에는 뜨지 않아요.</p>
+            <p style={{fontSize:11.5,color:'var(--rec)',marginTop:0,marginBottom:10,lineHeight:1.5}}>등록된 학생 중에 일치하는 이름이 없어요. "학생" 탭에서 먼저 등록해주세요. (목록에서 선택해야만 등록돼요)</p>
           );
         })()}
         {selectedStudentId && (
           <div style={{fontSize:11.5,color:'var(--brass-bright)',fontWeight:700,marginBottom:10}}>✓ {manualName} 학생과 연동돼요. 홈 화면에도 바로 표시돼요.</div>
         )}
-        <button className="btn" disabled={saving || !manualName.trim()} onClick={addMakeup} style={{marginBottom:20}}>
+        <button className="btn" disabled={saving || !selectedStudentId} onClick={addMakeup} style={{marginBottom:20}}>
           {(()=>{ const d = new Date(weekDate(makeupWeek)+'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일`; })()} {hourLabel12(hour)} 보강으로 지정
         </button>
 
