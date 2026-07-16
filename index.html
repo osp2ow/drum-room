@@ -1757,13 +1757,6 @@ function MyTab({ student, notices, onLogout }){
       <div className="card-title" style={{margin:'6px 0 12px'}}>📢 학원 공지사항</div>
       <NoticeList notices={notices} onSelect={setSelectedNotice} />
 
-      <div className="card" style={{marginTop:4}}>
-        <div className="card-title">이용 안내</div>
-        <p style={{fontSize:12.5,color:'var(--text-muted)',lineHeight:1.7,margin:0}}>
-          예약 및 수업시간 관련 문의는 원장님께 직접 연락해주세요.<br/>
-          수강 유형(취미생/입시생) 변경은 관리자만 가능합니다.
-        </p>
-      </div>
       <button className="btn btn-ghost" onClick={onLogout}>로그아웃</button>
       {selectedNotice && <NoticeDetailModal notice={selectedNotice} onClose={()=>setSelectedNotice(null)} />}
     </div>
