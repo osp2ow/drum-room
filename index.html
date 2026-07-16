@@ -1628,6 +1628,29 @@ function StatusTab({ student, blocks }){
    ============================================================ */
 function MyTab({ student, notices, onLogout }){
   const [selectedNotice, setSelectedNotice] = useState(null);
+  const [monthlyMinutes, setMonthlyMinutes] = useState(0);
+
+  useEffect(()=>{
+    if(student.type !== 'exam') return;
+    const unsub = db.collection(COL_RESERVATIONS).where('studentId','==',student.id).onSnapshot(snap=>{
+      const now = new Date();
+      const ym = `${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+      let total = 0;
+      snap.docs.forEach(doc=>{
+        const r = doc.data();
+        if(r.date && r.date.startsWith(ym)){
+          total += (toMin(r.end) - toMin(r.start));
+        }
+      });
+      setMonthlyMinutes(total);
+    });
+    return ()=>unsub();
+  }, [student.id, student.type]);
+
+  const thisMonth = new Date().getMonth() + 1;
+  const monthlyHours = Math.floor(monthlyMinutes / 60);
+  const monthlyRemMin = monthlyMinutes % 60;
+
   return (
     <div className="screen">
       <div className="eyebrow">MY PAGE</div>
@@ -1641,6 +1664,15 @@ function MyTab({ student, notices, onLogout }){
           <span className={"tag "+(student.type==='exam'?'tag-exam':'tag-hobby')}>{student.type==='exam'?'입시생':'취미생'}</span>
         </div>
       </div>
+
+      {student.type==='exam' && (
+        <div className="card">
+          <div className="card-title">📊 이번달 연습시간</div>
+          <div style={{fontFamily:'var(--font-display)',fontWeight:800,fontSize:24,color:'var(--brass-bright)'}}>
+            {thisMonth}월 총 연습시간 {monthlyHours}시간{monthlyRemMin>0?` ${monthlyRemMin}분`:''}
+          </div>
+        </div>
+      )}
 
       <div className="card-title" style={{margin:'6px 0 12px'}}>📢 학원 공지사항</div>
       <NoticeList notices={notices} onSelect={setSelectedNotice} />
