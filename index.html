@@ -324,6 +324,7 @@
   .tt-cell.absent{background:var(--rec);cursor:pointer;}
   .tt-cell.taken{background:var(--surface-3);}
   .tt-cell.mine-res{background:rgba(47,191,175,0.45);}
+  .tt-cell.peer-res{background:var(--brass-soft);}
   .tt-cell.makeup{background:#2E6FE8;cursor:pointer;}
   .tt-cell.booked:active{filter:brightness(0.95);}
   .tt-name{font-size:12px;font-weight:800;color:var(--brass-bright);line-height:1.3;}
@@ -1588,6 +1589,7 @@ function StudentTimetableTab({ student, blocks }){
   const dateScrollRef = useHScroll();
   const [selDate, setSelDate] = useState(fmtDate(new Date()));
   const [reservations, setReservations] = useState([]);
+  const availableRooms = useMemo(()=> getAvailableRooms(student.type), [student.type]);
 
   useEffect(()=>{
     const unsub = db.collection(COL_RESERVATIONS).where('date','==',selDate).onSnapshot(snap=>{
@@ -1629,7 +1631,7 @@ function StudentTimetableTab({ student, blocks }){
     <div className="screen">
       <div className="eyebrow">SCHEDULE</div>
       <h1 className="page-title">예약 일정표</h1>
-      <p className="page-sub">전체 방의 예약 현황을 한눈에 볼 수 있어요. (다른 학생 이름은 표시되지 않아요)</p>
+      <p className="page-sub">전체 방의 예약 현황을 한눈에 볼 수 있어요.{student.type==='exam' ? ' (입시생끼리는 서로 이름이 보여요)' : ' (다른 학생 이름은 표시되지 않아요)'}</p>
       <div className="date-scroll" ref={dateScrollRef}>
         {dates.map(d=>{
           const ds = fmtDate(d);
@@ -1658,27 +1660,32 @@ function StudentTimetableTab({ student, blocks }){
             <table className="timetable">
               <colgroup>
                 <col style={{width:'56px'}} />
-                {ROOMS.map(r=><col key={r} style={{width:'calc((100% - 56px) / 4)'}} />)}
+                {availableRooms.map(r=><col key={r} style={{width:`calc((100% - 56px) / ${availableRooms.length})`}} />)}
               </colgroup>
               <thead>
                 <tr>
                   <th className="tt-time-h"></th>
-                  {ROOMS.map(r=><th key={r}>{roomLabel(r)}</th>)}
+                  {availableRooms.map(r=><th key={r}>{roomLabel(r)}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {slots.map(t=>(
                   <tr key={t}>
                     <td className="tt-time">{t}</td>
-                    {ROOMS.map(r=>{
+                    {availableRooms.map(r=>{
                       const res = findRes(r, t);
                       if(res && res.start !== t) return null;
                       if(res){
                         const span = (toMin(res.end)-toMin(res.start))/30;
                         const mine = res.studentId === student.id;
+                        const showName = mine || (student.type==='exam' && res.studentType==='exam');
+                        const cls = mine ? 'mine-res' : (showName ? 'peer-res' : 'taken');
                         return (
-                          <td key={r} className={"tt-cell "+(mine?'mine-res':'taken')} rowSpan={span}>
-                            <div className="tt-name" style={mine?{color:'var(--brass-bright)',fontWeight:800}:{color:'var(--text-faint)'}}>{mine ? '내 예약' : '예약마감'}</div>
+                          <td key={r} className={"tt-cell "+cls} rowSpan={span}>
+                            <div className="tt-name" style={mine?{color:'var(--brass-bright)',fontWeight:800}:(showName?{color:'var(--brass-bright)'}:{color:'var(--text-faint)'})}>
+                              {mine ? '내 예약' : (showName ? res.studentName : '예약마감')}
+                            </div>
+                            {showName && !mine && <div className="tt-type">{res.studentType==='exam'?'입시':'취미'}</div>}
                           </td>
                         );
                       }
@@ -1703,7 +1710,7 @@ function StudentShell({ student, onLogout }){
   const [notices, setNotices] = useState([]);
   const [blocks, setBlocks] = useState([]);
   const [liveStudent, setLiveStudent] = useState(student);
-  useEffect(()=>{ if(tab==='timetable' && liveStudent.type!=='exam') setTab('home'); }, [liveStudent.type]);
+  useEffect(()=>{ if(tab==='status') setTab('home'); }, []);
 
   useEffect(()=>{
     const unsub = db.collection(COL_NOTICES).orderBy('createdAt','desc').onSnapshot(snap=>{
@@ -1726,17 +1733,10 @@ function StudentShell({ student, onLogout }){
     return ()=>unsub();
   }, [student.id]);
 
-  const isExam = liveStudent.type === 'exam';
-  const tabs = isExam ? [
+  const tabs = [
     { key:'home', label:'홈', icon:<Icon.home/> },
     { key:'reserve', label:'예약', icon:<Icon.cal/> },
-    { key:'status', label:'현황', icon:<Icon.grid/> },
     { key:'timetable', label:'일정표', icon:<Icon.clock/> },
-    { key:'my', label:'마이', icon:<Icon.user/> },
-  ] : [
-    { key:'home', label:'홈', icon:<Icon.home/> },
-    { key:'reserve', label:'예약', icon:<Icon.cal/> },
-    { key:'status', label:'현황', icon:<Icon.grid/> },
     { key:'my', label:'마이', icon:<Icon.user/> },
   ];
 
@@ -1747,8 +1747,7 @@ function StudentShell({ student, onLogout }){
       <AppHeader right={<span>{liveStudent.type==='exam'?'입시생':'취미생'}</span>} />
       <div style={{display: tab==='home' ? 'block' : 'none'}}><HomeTab student={liveStudent} notices={visibleNotices} onGoReserve={()=>setTab('reserve')} /></div>
       <div style={{display: tab==='reserve' ? 'block' : 'none'}}><ReserveTab student={liveStudent} blocks={blocks} /></div>
-      <div style={{display: tab==='status' ? 'block' : 'none'}}><StatusTab student={liveStudent} blocks={blocks} /></div>
-      {isExam && <div style={{display: tab==='timetable' ? 'block' : 'none'}}><StudentTimetableTab student={liveStudent} blocks={blocks} /></div>}
+      <div style={{display: tab==='timetable' ? 'block' : 'none'}}><StudentTimetableTab student={liveStudent} blocks={blocks} /></div>
       <div style={{display: tab==='my' ? 'block' : 'none'}}><MyTab student={liveStudent} notices={visibleNotices} onLogout={onLogout} /></div>
       <TabBar tabs={tabs} active={tab} onChange={setTab} />
     </React.Fragment>
@@ -1931,10 +1930,12 @@ function AdminReservationsTab(){
       <div className="date-scroll" ref={dateScrollRef}>
         {dates.map(d=>{
           const ds = fmtDate(d);
+          const isToday = ds === fmtDate(new Date());
           return (
             <div key={ds} className={"date-chip"+(ds===selDate?' active':'')} onClick={()=>setSelDate(ds)}>
               <div className="dow">{DOW[d.getDay()]}</div>
               <div className="num">{d.getDate()}</div>
+              {isToday && <div className="today-label">TODAY</div>}
             </div>
           );
         })}
@@ -1967,7 +1968,6 @@ function AdminReservationsTab(){
                       return (
                         <td key={r} className="tt-cell booked" rowSpan={span} onClick={()=>setEditing(res)}>
                           <div className="tt-name">{res.studentName}</div>
-                          <div className="tt-type">{res.studentType==='exam'?'입시':'취미'}</div>
                         </td>
                       );
                     }
@@ -2646,7 +2646,7 @@ function AdminShell({ onLogout }){
   const tabs = [
     { key:'students', label:'학생', icon:<Icon.user/> },
     { key:'timetable', label:'시간표', icon:<Icon.clock/> },
-    { key:'reservations', label:'예약', icon:<Icon.cal/> },
+    { key:'reservations', label:'일정', icon:<Icon.cal/> },
     { key:'blocks', label:'차단', icon:<Icon.lock/> },
     { key:'notices', label:'공지', icon:<Icon.bell/> },
   ];
