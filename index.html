@@ -232,6 +232,10 @@
   .hero-schedule-line{font-family:var(--font-display);font-size:15.5px;font-weight:500;letter-spacing:-0.01em;color:#FFFFFF;margin-top:9px;line-height:1.4;}
   .hero-makeup-line{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
   .hero-makeup-badge{background:rgba(255,255,255,0.92);color:#2E6FE8;font-size:11.5px;font-weight:800;padding:5px 11px;border-radius:100px;white-space:nowrap;}
+  .student-suggest-list{border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px;background:var(--surface);}
+  .student-suggest-item{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13.5px;font-weight:600;}
+  .student-suggest-item:last-child{border-bottom:none;}
+  .student-suggest-item:active{background:var(--surface-2);}
 
   .notice-banner{
     display:flex;gap:9px;align-items:flex-start;
@@ -1664,6 +1668,7 @@ function MonthlyStatsModal({ reservations, onClose }){
   const barW = 34;
   const gap = 18;
   const chartW = months.length * (barW + gap);
+  const topPad = 26;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -1676,22 +1681,22 @@ function MonthlyStatsModal({ reservations, onClose }){
         <p style={{fontSize:12,color:'var(--text-muted)',marginTop:0,marginBottom:18}}>최근 6개월간 예약해서 사용한 연습실 시간 합계예요.</p>
 
         <div style={{overflowX:'auto'}}>
-          <svg width={chartW} height={chartH+34} viewBox={`0 0 ${chartW} ${chartH+34}`}>
+          <svg width={chartW} height={topPad+chartH+34} viewBox={`0 0 ${chartW} ${topPad+chartH+34}`}>
             {months.map((m,i)=>{
               const h = maxHours>0 ? (m.hours/maxHours)*chartH : 0;
               const x = i*(barW+gap) + gap/2;
-              const y = chartH - h;
+              const y = topPad + chartH - h;
               return (
                 <g key={i}>
                   <rect x={x} y={y} width={barW} height={Math.max(h,2)} rx="7"
                     fill={m.isCurrent ? '#2FBFAF' : 'rgba(47,191,175,0.35)'} />
-                  <text x={x+barW/2} y={y-8} textAnchor="middle" fontSize="11" fontWeight="700"
-                    fill={m.isCurrent ? '#17968A' : '#5C6E6C'}>{m.hours}h</text>
-                  <text x={x+barW/2} y={chartH+22} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#1E2B2A">{m.label}</text>
+                  <text x={x+barW/2} y={y-8} textAnchor="middle" fontSize="12" fontWeight="800"
+                    fill={m.isCurrent ? '#17968A' : '#5C6E6C'}>{m.hours}시간</text>
+                  <text x={x+barW/2} y={topPad+chartH+22} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#1E2B2A">{m.label}</text>
                 </g>
               );
             })}
-            <line x1="0" y1={chartH} x2={chartW} y2={chartH} stroke="#DCE7E6" strokeWidth="1" />
+            <line x1="0" y1={topPad+chartH} x2={chartW} y2={topPad+chartH} stroke="#DCE7E6" strokeWidth="1" />
           </svg>
         </div>
       </div>
@@ -2844,6 +2849,7 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
   const { day, dayIdx, hour, date } = cell;
   const [saving, setSaving] = useState(false);
   const [manualName, setManualName] = useState('');
+  const [selectedStudentId, setSelectedStudentId] = useState('');
   const [makeupWeek, setMakeupWeek] = useState(0);
   const [noteText, setNoteText] = useState(cell.noteOverride?.note || '');
 
@@ -2879,7 +2885,8 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
   }
 
   async function addMakeup(){
-    const name = manualName.trim();
+    const picked = students.find(s=>s.id===selectedStudentId);
+    const name = picked ? picked.name : manualName.trim();
     if(!name) return;
     const targetDate = weekDate(makeupWeek);
     setSaving(true);
@@ -2887,12 +2894,12 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
       await db.collection(COL_OVERRIDES).add({
         date: targetDate, day, start:hour, end:toTime(toMin(hour)+60),
         kind:'makeup',
-        studentId: null,
+        studentId: picked ? picked.id : null,
         studentName: name,
-        studentType: null,
+        studentType: picked ? picked.type : null,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      setManualName('');
+      setManualName(''); setSelectedStudentId('');
     }catch(e){ alert('처리 중 오류가 발생했어요. 다시 시도해주세요.'); }
     setSaving(false);
   }
@@ -2980,7 +2987,27 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
             <div key={off} className={"toggle-opt"+(makeupWeek===off?' active':'')} onClick={()=>setMakeupWeek(off)}>{label}</div>
           ))}
         </div>
-        <input className="input" placeholder="보강 학생 이름 입력" value={manualName} onChange={e=>setManualName(e.target.value)} style={{marginBottom:10}} />
+        <input className="input" placeholder="보강 학생 이름 검색" value={manualName}
+          onChange={e=>{ setManualName(e.target.value); setSelectedStudentId(''); }}
+          style={{marginBottom: (!selectedStudentId && manualName.trim()) ? 6 : 10}} />
+        {!selectedStudentId && manualName.trim() && (()=>{
+          const matches = students.filter(s=>s.name.includes(manualName.trim())).slice(0,6);
+          return matches.length > 0 ? (
+            <div className="student-suggest-list">
+              {matches.map(s=>(
+                <div key={s.id} className="student-suggest-item" onClick={()=>{ setSelectedStudentId(s.id); setManualName(s.name); }}>
+                  <span>{s.name}</span>
+                  <span className={"tag "+(s.type==='exam'?'tag-exam':'tag-hobby')}>{s.type==='exam'?'입시생':'취미생'}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={{fontSize:11.5,color:'var(--text-faint)',marginTop:0,marginBottom:10,lineHeight:1.5}}>일치하는 학생이 없어요. 이대로 등록하면 이름만 기록되고, 그 학생 홈 화면에는 뜨지 않아요.</p>
+          );
+        })()}
+        {selectedStudentId && (
+          <div style={{fontSize:11.5,color:'var(--brass-bright)',fontWeight:700,marginBottom:10}}>✓ {manualName} 학생과 연동돼요. 홈 화면에도 바로 표시돼요.</div>
+        )}
         <button className="btn" disabled={saving || !manualName.trim()} onClick={addMakeup} style={{marginBottom:20}}>
           {(()=>{ const d = new Date(weekDate(makeupWeek)+'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일`; })()} {hourLabel12(hour)} 보강으로 지정
         </button>
