@@ -329,6 +329,8 @@
   .class-timetable .tt-cell{height:54px;}
   .tt-note-dot{position:absolute;bottom:2px;right:3px;font-size:9.5px;}
   .tt-cell:last-child{border-right:none;}
+  .timetable tr:last-child .tt-cell,
+  .timetable tr:last-child .tt-time{border-bottom:none;}
   .tt-cell.empty{color:var(--text-faint);font-size:11px;}
   .tt-cell.booked{background:var(--brass-soft);cursor:pointer;}
   .tt-cell.absent{background:var(--rec);cursor:pointer;}
@@ -887,6 +889,7 @@ function HomeTab({ student, notices, onGoReserve }){
   const latestNotice = notices[0];
   const [myReservations, setMyReservations] = useState([]);
   const [showManage, setShowManage] = useState(false);
+  const [showNotice, setShowNotice] = useState(false);
 
   useEffect(()=>{
     const unsub = db.collection(COL_RESERVATIONS).where('studentId','==',student.id).onSnapshot(snap=>{
@@ -915,11 +918,12 @@ function HomeTab({ student, notices, onGoReserve }){
   return (
     <div className="screen">
       {latestNotice && (
-        <div className="notice-banner">
+        <div className="notice-banner" onClick={()=>setShowNotice(true)} style={{cursor:'pointer'}}>
           <span className="notice-banner-badge">공지</span>
           <span className="notice-banner-text">{latestNotice.important && '⭐ '}{latestNotice.title} — {latestNotice.content}</span>
         </div>
       )}
+      {showNotice && latestNotice && <NoticeDetailModal notice={latestNotice} onClose={()=>setShowNotice(false)} />}
 
       <div className="hero-card">
         <div className="hero-top">
@@ -1455,19 +1459,37 @@ function DatePickerModal({ selDate, minDate, maxDate, onSelect, onClose }){
 /* ============================================================
    STUDENT: NOTICE TAB
    ============================================================ */
-function NoticeList({ notices }){
+function NoticeList({ notices, onSelect }){
   return (
     <React.Fragment>
       {notices.length===0 ? (
         <div className="empty-state"><div className="icon">📭</div><p>아직 등록된 공지사항이 없어요.</p></div>
       ) : notices.map(n=>(
-        <div className={"notice-item"+(n.important?' important':'')} key={n.id}>
+        <div className={"notice-item"+(n.important?' important':'')} key={n.id} onClick={()=>onSelect && onSelect(n)} style={{cursor: onSelect ? 'pointer' : 'default'}}>
           <div className="notice-title">{n.important && '⭐ '}{n.title}</div>
           <div className="notice-date">{n.createdAt && n.createdAt.toDate ? n.createdAt.toDate().toLocaleDateString('ko-KR') : ''}</div>
-          <div className="notice-body">{n.content}</div>
+          <div className="notice-body" style={{ display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{n.content}</div>
         </div>
       ))}
     </React.Fragment>
+  );
+}
+
+function NoticeDetailModal({ notice, onClose }){
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div className="modal-close-row">
+          <div className="modal-title">{notice.important && '⭐ '}{notice.title}</div>
+          <div className="icon-btn" onClick={onClose}>✕</div>
+        </div>
+        <div className="notice-date" style={{marginBottom:14}}>
+          {notice.createdAt && notice.createdAt.toDate ? notice.createdAt.toDate().toLocaleDateString('ko-KR') : ''}
+        </div>
+        <p style={{fontSize:13.5,color:'var(--text)',lineHeight:1.7,whiteSpace:'pre-wrap',margin:0}}>{notice.content}</p>
+      </div>
+    </div>
   );
 }
 
@@ -1589,6 +1611,7 @@ function StatusTab({ student, blocks }){
    STUDENT: MY TAB
    ============================================================ */
 function MyTab({ student, notices, onLogout }){
+  const [selectedNotice, setSelectedNotice] = useState(null);
   return (
     <div className="screen">
       <div className="eyebrow">MY PAGE</div>
@@ -1604,7 +1627,7 @@ function MyTab({ student, notices, onLogout }){
       </div>
 
       <div className="card-title" style={{margin:'6px 0 12px'}}>📢 학원 공지사항</div>
-      <NoticeList notices={notices} />
+      <NoticeList notices={notices} onSelect={setSelectedNotice} />
 
       <div className="card" style={{marginTop:4}}>
         <div className="card-title">이용 안내</div>
@@ -1614,6 +1637,7 @@ function MyTab({ student, notices, onLogout }){
         </p>
       </div>
       <button className="btn btn-ghost" onClick={onLogout}>로그아웃</button>
+      {selectedNotice && <NoticeDetailModal notice={selectedNotice} onClose={()=>setSelectedNotice(null)} />}
     </div>
   );
 }
@@ -2332,20 +2356,30 @@ function NoticeEditModal({ notice, onClose }){
   const [saving, setSaving] = useState(false);
 
   async function save(){
-    if(!title.trim() || !content.trim()) return;
+    if(!title.trim() || !content.trim()){ alert('제목과 내용을 모두 입력해주세요.'); return; }
     setSaving(true);
-    if(notice){
-      await db.collection(COL_NOTICES).doc(notice.id).update({ title, content, important, audience });
-    } else {
-      await db.collection(COL_NOTICES).add({ title, content, important, audience, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    try{
+      if(notice){
+        await db.collection(COL_NOTICES).doc(notice.id).update({ title, content, important, audience });
+      } else {
+        await db.collection(COL_NOTICES).add({ title, content, important, audience, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      }
+      onClose();
+    }catch(e){
+      console.error(e);
+      alert('공지 저장 중 오류가 발생했어요: ' + (e && e.message ? e.message : e));
+      setSaving(false);
     }
-    setSaving(false);
-    onClose();
   }
   async function del(){
     if(!window.confirm('이 공지를 삭제할까요?')) return;
-    await db.collection(COL_NOTICES).doc(notice.id).delete();
-    onClose();
+    try{
+      await db.collection(COL_NOTICES).doc(notice.id).delete();
+      onClose();
+    }catch(e){
+      console.error(e);
+      alert('공지 삭제 중 오류가 발생했어요: ' + (e && e.message ? e.message : e));
+    }
   }
 
   return (
