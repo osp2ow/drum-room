@@ -2171,6 +2171,7 @@ function AdminReservationsTab(){
   const [blocks, setBlocks] = useState([]);
   const [editing, setEditing] = useState(null);
   const [cellModal, setCellModal] = useState(null);
+  const ADMIN_ROOMS = [1,2,3,4,5];
 
   useEffect(()=>{
     const unsub = db.collection(COL_RESERVATIONS).where('date','==',selDate).onSnapshot(snap=>{
@@ -2191,9 +2192,13 @@ function AdminReservationsTab(){
     for(let i=0;i<14;i++){ const cand = addDays(d,i); if(cand.getDay()!==0) arr.push(cand); }
     return arr;
   }, []);
+  const minDate = fmtDate(dates[0]);
+  const maxDate = fmtDate(dates[dates.length-1]);
+  const isEnsembleFree = useEnsembleFree(minDate, maxDate);
 
   const dateObj = useMemo(()=> new Date(selDate+'T00:00:00'), [selDate]);
   const hours = useMemo(()=> getOperatingHours(dateObj), [dateObj]);
+  const ensembleHoursToday = useMemo(()=> getEnsembleHours(dateObj), [dateObj]);
   const slots = useMemo(()=> generateHalfHourSlots(hours), [hours]);
   const isToday = selDate === fmtDate(new Date());
   const nowTop = useNowLineTop(wrapRef, tbodyRef, hours, isToday);
@@ -2207,12 +2212,17 @@ function AdminReservationsTab(){
     const s = toMin(time), e = s+30;
     return blocks.find(b=> Number(b.room)===room && b.day===dow && toMin(b.start)<=s && e<=toMin(b.end)) || null;
   }
+  function ensembleState(time){
+    if(!ensembleHoursToday) return 'unavailable';
+    if(toMin(time) < toMin(ensembleHoursToday.start) || toMin(time) >= toMin(ensembleHoursToday.end)) return 'unavailable';
+    return isEnsembleFree(selDate, time) ? 'free' : 'busy';
+  }
 
   return (
     <div className="screen">
       <div className="eyebrow">ADMIN</div>
       <h1 className="page-title">예약 일정표</h1>
-      <p className="page-sub">날짜를 고르면 전체 방의 예약 현황을 한눈에 볼 수 있어요. 칸을 눌러서 예약 수정·추가, 차단 추가·해제를 할 수 있어요.</p>
+      <p className="page-sub">날짜를 고르면 전체 방의 예약 현황을 한눈에 볼 수 있어요. 칸을 눌러서 예약 수정·추가, 차단 추가·해제를 할 수 있어요. (합주실은 수업 시간표와 자동 연동돼요)</p>
       <div className="date-scroll" ref={dateScrollRef}>
         {dates.map(d=>{
           const ds = fmtDate(d);
@@ -2234,19 +2244,19 @@ function AdminReservationsTab(){
           <table className="timetable">
             <colgroup>
               <col style={{width:'56px'}} />
-              {ROOMS.map(r=><col key={r} style={{width:'calc((100% - 56px) / 4)'}} />)}
+              {ADMIN_ROOMS.map(r=><col key={r} style={{width:`calc((100% - 56px) / ${ADMIN_ROOMS.length})`}} />)}
             </colgroup>
             <thead>
               <tr>
                 <th className="tt-time-h"></th>
-                {ROOMS.map(r=><th key={r}>{roomLabel(r)}</th>)}
+                {ADMIN_ROOMS.map(r=><th key={r}>{roomLabel(r)}</th>)}
               </tr>
             </thead>
             <tbody ref={tbodyRef}>
               {slots.map(t=>(
                 <tr key={t}>
                   <td className="tt-time">{t}</td>
-                  {ROOMS.map(r=>{
+                  {ADMIN_ROOMS.map(r=>{
                     const res = findRes(r, t);
                     if(res && res.start !== t) return null;
                     if(res){
@@ -2256,6 +2266,12 @@ function AdminReservationsTab(){
                           <div className="tt-name">{res.studentName}</div>
                         </td>
                       );
+                    }
+                    if(r === 5){
+                      const est = ensembleState(t);
+                      if(est==='unavailable') return <td key={r} className="tt-cell empty" style={{opacity:0.3}}>–</td>;
+                      if(est==='busy') return <td key={r} className="tt-cell empty" style={{cursor:'pointer'}} onClick={()=>setCellModal({room:r, time:t, block:null})}>🎓</td>;
+                      return <td key={r} className="tt-cell empty" style={{cursor:'pointer'}} onClick={()=>setCellModal({room:r, time:t, block:null})}>·</td>;
                     }
                     const blk = findBlock(r, t);
                     if(blk){
@@ -2280,11 +2296,12 @@ function AdminReservationsTab(){
 
 function AdminCellModal({ cell, selDate, dow, onClose }){
   const { room, time, block } = cell;
-  const [mode, setMode] = useState(null); // null | 'reserve' | 'block'
+  const isEnsemble = Number(room) === 5;
+  const [mode, setMode] = useState(isEnsemble ? 'reserve' : null); // null | 'reserve' | 'block'
   const [saving, setSaving] = useState(false);
   const [students, setStudents] = useState([]);
   const [studentId, setStudentId] = useState('');
-  const [studentFilter, setStudentFilter] = useState('all'); // all | hobby | exam
+  const [studentFilter, setStudentFilter] = useState(isEnsemble ? 'exam' : 'all'); // all | hobby | exam
   const [studentSearch, setStudentSearch] = useState('');
   const [start, setStart] = useState(time);
   const [end, setEnd] = useState(toTime(Math.min(toMin(time)+60, 22*60)));
@@ -2369,6 +2386,7 @@ function AdminCellModal({ cell, selDate, dow, onClose }){
           </div>
         ) : mode==='reserve' ? (
           <React.Fragment>
+            {isEnsemble && <p style={{fontSize:11.5,color:'var(--brass-bright)',marginTop:0,marginBottom:12,lineHeight:1.5}}>합주실은 수업 시간표와 자동 연동돼요. 관리자가 직접 등록하면 시간 제한과 상관없이 바로 등록돼요.</p>}
             <div className="input-label">학생</div>
             <div className="toggle-row" style={{marginBottom:10}}>
               <div className={"toggle-opt"+(studentFilter==='all'?' active':'')} onClick={()=>setStudentFilter('all')}>전체</div>
