@@ -230,6 +230,8 @@
   .hero-name{font-family:var(--font-display);font-size:18.5px;font-weight:800;letter-spacing:-0.01em;}
   .hero-sub{font-size:11.5px;color:rgba(255,255,255,0.9);font-weight:700;flex-shrink:0;}
   .hero-schedule-line{font-family:var(--font-display);font-size:15.5px;font-weight:500;letter-spacing:-0.01em;color:#FFFFFF;margin-top:9px;line-height:1.4;}
+  .hero-makeup-line{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .hero-makeup-badge{background:rgba(255,255,255,0.92);color:#2E6FE8;font-size:11.5px;font-weight:800;padding:5px 11px;border-radius:100px;white-space:nowrap;}
 
   .notice-banner{
     display:flex;gap:9px;align-items:flex-start;
@@ -907,6 +909,18 @@ function HomeTab({ student, notices, onGoReserve }){
     return ()=>unsub();
   }, [student.id]);
 
+  const [makeupItems, setMakeupItems] = useState([]);
+  useEffect(()=>{
+    const unsub = db.collection(COL_OVERRIDES).where('studentId','==',student.id).onSnapshot(snap=>{
+      const todayStr = fmtDate(new Date());
+      const maxStr = fmtDate(addDays(new Date(), 13)); // 이번주 + 다음주까지 표시
+      const items = snap.docs.map(d=>d.data()).filter(o=> o.kind==='makeup' && o.date>=todayStr && o.date<=maxStr);
+      items.sort((a,b)=> a.date<b.date?-1:1);
+      setMakeupItems(items);
+    });
+    return ()=>unsub();
+  }, [student.id]);
+
   const weekDates = useMemo(()=>{
     const arr = []; let d = new Date(); d.setHours(0,0,0,0);
     for(let i=0;i<=7;i++){ const cand = addDays(d,i); if(cand.getDay()!==0) arr.push(cand); }
@@ -942,6 +956,13 @@ function HomeTab({ student, notices, onGoReserve }){
         <div className="hero-schedule-line">
           나의 수업시간 : {schedule.length === 0 ? '등록된 수업시간이 없어요' : schedule.map(s=>`${s.day}요일 ${hourLabel12(s.start)}`).join(', ')}
         </div>
+        {makeupItems.length > 0 && (
+          <div className="hero-makeup-line">
+            {makeupItems.map((m,i)=>(
+              <span key={i} className="hero-makeup-badge">🔵 {m.day}요일 {hourLabel12(m.start)} 보강수업</span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="quick-grid">
