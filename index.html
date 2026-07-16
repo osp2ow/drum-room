@@ -533,7 +533,8 @@ function useHScroll(){
 }
 
 // 일정표 안에서 '지금 시각'을 가로줄로 표시하기 위한 위치 계산 훅
-function useNowLineTop(wrapRef, tbodyRef, hours, isToday){
+function useNowLineTop(wrapRef, tbodyRef, hours, isToday, slotMinutes){
+  const stepMin = slotMinutes || 30;
   const [top, setTop] = useState(null);
   useEffect(()=>{
     function update(){
@@ -542,8 +543,8 @@ function useNowLineTop(wrapRef, tbodyRef, hours, isToday){
       const nowMin = now.getHours()*60 + now.getMinutes();
       const startMin = toMin(hours.start), endMin = toMin(hours.end);
       if(nowMin < startMin || nowMin > endMin){ setTop(null); return; }
-      const totalSlots = (endMin - startMin) / 30;
-      const rowIndex = (nowMin - startMin) / 30;
+      const totalSlots = (endMin - startMin) / stepMin;
+      const rowIndex = (nowMin - startMin) / stepMin;
       const wrapRect = wrapRef.current.getBoundingClientRect();
       const tbodyRect = tbodyRef.current.getBoundingClientRect();
       if(tbodyRect.height <= 0){ setTop(null); return; }
@@ -554,7 +555,7 @@ function useNowLineTop(wrapRef, tbodyRef, hours, isToday){
     const id = setInterval(update, 60000);
     window.addEventListener('resize', update);
     return ()=>{ clearInterval(id); window.removeEventListener('resize', update); };
-  }, [hours, isToday]);
+  }, [hours, isToday, stepMin]);
   return top;
 }
 
@@ -2801,6 +2802,8 @@ function getMonday(offsetWeeks){
 }
 
 function AdminTimetableTab(){
+  const wrapRef = React.useRef(null);
+  const tbodyRef = React.useRef(null);
   const [students, setStudents] = useState([]);
   const [overrides, setOverrides] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
@@ -2820,6 +2823,8 @@ function AdminTimetableTab(){
     return DAYS.map((_,i)=> addDays(monday, i));
   }, []);
   const weekDateStrs = weekDates.map(fmtDate);
+  const isThisWeek = weekDateStrs.includes(fmtDate(new Date()));
+  const nowTop = useNowLineTop(wrapRef, tbodyRef, { start:'12:00', end:'22:00' }, isThisWeek, 60);
 
   // 이번주~다다음주까지 결석 예약이 가능하도록 3주 범위를 통째로 구독
   const rangeStart = fmtDate(getMonday(0));
@@ -2865,7 +2870,7 @@ function AdminTimetableTab(){
   }
 
   return (
-    <div className="screen">
+    <div className="screen" style={{maxWidth:480, margin:'0 auto'}}>
       <div className="eyebrow">ADMIN</div>
       <h1 className="page-title">수업 시간표</h1>
 
@@ -2875,7 +2880,7 @@ function AdminTimetableTab(){
         <div className="legend-item"><div className="legend-dot" style={{background:'#2E6FE8'}}/>보강</div>
       </div>
 
-      <div className="timetable-wrap">
+      <div className="timetable-wrap" ref={wrapRef}>
         <table className="timetable class-timetable">
           <colgroup>
             <col style={{width:'46px'}} />
@@ -2887,7 +2892,7 @@ function AdminTimetableTab(){
               {DAYS.map(d=><th key={d}>{d}</th>)}
             </tr>
           </thead>
-          <tbody>
+          <tbody ref={tbodyRef}>
             {HOURS.map(h=>(
               <tr key={h}>
                 <td className="tt-time">{hourLabel12(h)}</td>
@@ -2932,6 +2937,7 @@ function AdminTimetableTab(){
             ))}
           </tbody>
         </table>
+        {nowTop!=null && <div className="tt-now-line" style={{top:nowTop}}><span className="tt-now-dot"/></div>}
       </div>
 
       {editingCell && <SlotOverrideModal cell={editingCell} students={students} overrides={overrides} onClose={()=>setEditingCell(null)} />}
