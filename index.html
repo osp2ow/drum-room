@@ -249,6 +249,8 @@
   .date-chip{position:relative;}
   .res-dot{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--rec);}
   .res-dot.on-active{background:#FFFFFF;}
+  .today-label{font-family:var(--font-mono);font-size:8.5px;font-weight:800;color:var(--rec);letter-spacing:0.03em;margin-top:2px;}
+  .date-chip.active .today-label{color:#FFFFFF;}
 
   .date-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;cursor:grab;}
   .date-scroll.dragging{cursor:grabbing;user-select:none;}
@@ -321,6 +323,7 @@
   .tt-cell.booked{background:var(--brass-soft);cursor:pointer;}
   .tt-cell.absent{background:var(--rec);cursor:pointer;}
   .tt-cell.taken{background:var(--surface-3);}
+  .tt-cell.mine-res{background:var(--brass);box-shadow:0 3px 8px rgba(47,191,175,0.35);}
   .tt-cell.makeup{background:#2E6FE8;cursor:pointer;}
   .tt-cell.booked:active{filter:brightness(0.95);}
   .tt-name{font-size:12px;font-weight:800;color:var(--brass-bright);line-height:1.3;}
@@ -912,9 +915,10 @@ function HomeTab({ student, notices, onGoReserve }){
             const ds = fmtDate(d);
             const isToday = ds === todayStr;
             return (
-              <div key={ds} className={"date-chip"+(ds===selDay?' active':'')+(isToday?' today':'')} onClick={()=>setSelDay(ds)}>
+              <div key={ds} className={"date-chip"+(ds===selDay?' active':'')} onClick={()=>setSelDay(ds)}>
                 <div className="dow">{DOW[d.getDay()]}</div>
                 <div className="num">{d.getDate()}</div>
+                {isToday && <div className="today-label">TODAY</div>}
                 {reservedDates.has(ds) && <div className={"res-dot"+(ds===selDay?' on-active':'')}/>}
               </div>
             );
@@ -1596,6 +1600,15 @@ function StudentTimetableTab({ student, blocks }){
     return arr;
   }, []);
 
+  const [myAllReservations, setMyAllReservations] = useState([]);
+  useEffect(()=>{
+    const unsub = db.collection(COL_RESERVATIONS).where('studentId','==',student.id).onSnapshot(snap=>{
+      setMyAllReservations(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return ()=>unsub();
+  }, [student.id]);
+  const myReservedDates = useMemo(()=> new Set(myAllReservations.map(r=>r.date)), [myAllReservations]);
+
   const dateObj = useMemo(()=> new Date(selDate+'T00:00:00'), [selDate]);
   const hours = useMemo(()=> getOperatingHours(dateObj), [dateObj]);
   const slots = useMemo(()=> generateHalfHourSlots(hours), [hours]);
@@ -1623,6 +1636,7 @@ function StudentTimetableTab({ student, blocks }){
             <div key={ds} className={"date-chip"+(ds===selDate?' active':'')+(isToday?' today':'')} onClick={()=>setSelDate(ds)}>
               <div className="dow">{DOW[d.getDay()]}</div>
               <div className="num">{d.getDate()}</div>
+              {myReservedDates.has(ds) && <div className={"res-dot"+(ds===selDate?' on-active':'')}/>}
             </div>
           );
         })}
@@ -1660,8 +1674,8 @@ function StudentTimetableTab({ student, blocks }){
                         const span = (toMin(res.end)-toMin(res.start))/30;
                         const mine = res.studentId === student.id;
                         return (
-                          <td key={r} className={"tt-cell "+(mine?'booked':'taken')} rowSpan={span}>
-                            <div className="tt-name" style={mine?{}:{color:'var(--text-faint)'}}>{mine ? '내 예약' : '예약마감'}</div>
+                          <td key={r} className={"tt-cell "+(mine?'mine-res':'taken')} rowSpan={span}>
+                            <div className="tt-name" style={mine?{color:'#FFFFFF'}:{color:'var(--text-faint)'}}>{mine ? '내 예약' : '예약마감'}</div>
                           </td>
                         );
                       }
