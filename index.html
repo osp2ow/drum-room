@@ -58,7 +58,10 @@
     --font-mono:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;
     --safe-b: env(safe-area-inset-bottom, 0px);
     --safe-t: env(safe-area-inset-top, 0px);
+    --app-max-w: 480px;
   }
+  @media (min-width: 700px){ :root{ --app-max-w: 640px; } }
+  @media (min-width: 1024px){ :root{ --app-max-w: 900px; } }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;background:var(--ink);}
   body{
@@ -67,7 +70,7 @@
     overscroll-behavior-y:none;
   }
   #root{
-    max-width:480px;
+    max-width:var(--app-max-w);
     margin:0 auto;
     min-height:100vh;
     background:
@@ -196,7 +199,7 @@
 
   .reserve-sheet{
     position:fixed;bottom:calc(64px + var(--safe-b));left:50%;transform:translateX(-50%);
-    width:100%;max-width:480px;background:var(--surface);
+    width:100%;max-width:var(--app-max-w);background:var(--surface);
     border-top:1px solid var(--border);border-radius:20px 20px 0 0;
     padding:16px 20px calc(14px + var(--safe-b));
     box-shadow:0 -8px 24px rgba(20,40,38,0.14);
@@ -207,7 +210,7 @@
 
   .tabbar{
     position:fixed;bottom:0;left:50%;transform:translateX(-50%);
-    width:100%;max-width:480px;
+    width:100%;max-width:var(--app-max-w);
     display:flex;background:rgba(255,255,255,0.94);backdrop-filter:blur(14px);
     border-top:1px solid var(--border);
     padding:9px 6px calc(9px + var(--safe-b));
@@ -439,7 +442,7 @@
     animation:fadeIn .18s ease;
   }
   .modal-sheet{
-    width:100%;max-width:480px;background:var(--surface);border-radius:20px 20px 0 0;
+    width:100%;max-width:var(--app-max-w);background:var(--surface);border-radius:20px 20px 0 0;
     padding:22px 20px calc(24px + var(--safe-b));max-height:86vh;overflow-y:auto;overflow-x:hidden;
     border-top:1px solid var(--border);
   }
