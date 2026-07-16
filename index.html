@@ -304,7 +304,9 @@
   .free-chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
   .free-chip{background:var(--brass-soft);color:var(--brass-bright);font-size:11px;font-weight:700;padding:5px 10px;border-radius:100px;white-space:nowrap;}
 
-  .timetable-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:16px;background:var(--surface);margin-bottom:14px;}
+  .timetable-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:16px;background:var(--surface);margin-bottom:14px;position:relative;}
+  .tt-now-line{position:absolute;left:0;right:0;height:0;border-top:2px solid var(--rec);z-index:20;pointer-events:none;}
+  .tt-now-dot{position:absolute;left:2px;top:-4px;width:8px;height:8px;border-radius:50%;background:var(--rec);}
   .timetable{border-collapse:collapse;width:100%;table-layout:fixed;}
   .timetable th{
     font-family:var(--font-display);font-size:12.5px;font-weight:700;color:var(--text);
@@ -501,6 +503,32 @@ function useHScroll(){
     };
   }, []);
   return ref;
+}
+
+// 일정표 안에서 '지금 시각'을 가로줄로 표시하기 위한 위치 계산 훅
+function useNowLineTop(wrapRef, tbodyRef, hours, isToday){
+  const [top, setTop] = useState(null);
+  useEffect(()=>{
+    function update(){
+      if(!isToday || !hours || !wrapRef.current || !tbodyRef.current){ setTop(null); return; }
+      const now = new Date();
+      const nowMin = now.getHours()*60 + now.getMinutes();
+      const startMin = toMin(hours.start), endMin = toMin(hours.end);
+      if(nowMin < startMin || nowMin > endMin){ setTop(null); return; }
+      const totalSlots = (endMin - startMin) / 30;
+      const rowIndex = (nowMin - startMin) / 30;
+      const wrapRect = wrapRef.current.getBoundingClientRect();
+      const tbodyRect = tbodyRef.current.getBoundingClientRect();
+      if(tbodyRect.height <= 0){ setTop(null); return; }
+      const avgRowH = tbodyRect.height / totalSlots;
+      setTop((tbodyRect.top - wrapRect.top) + rowIndex * avgRowH);
+    }
+    update();
+    const id = setInterval(update, 60000);
+    window.addEventListener('resize', update);
+    return ()=>{ clearInterval(id); window.removeEventListener('resize', update); };
+  }, [hours, isToday]);
+  return top;
 }
 
 /* ============================================================
@@ -1587,6 +1615,8 @@ function MyTab({ student, notices, onLogout }){
    ============================================================ */
 function StudentTimetableTab({ student, blocks }){
   const dateScrollRef = useHScroll();
+  const wrapRef = React.useRef(null);
+  const tbodyRef = React.useRef(null);
   const [selDate, setSelDate] = useState(fmtDate(new Date()));
   const [reservations, setReservations] = useState([]);
   const availableRooms = useMemo(()=> getAvailableRooms(student.type), [student.type]);
@@ -1617,6 +1647,8 @@ function StudentTimetableTab({ student, blocks }){
   const hours = useMemo(()=> getOperatingHours(dateObj), [dateObj]);
   const slots = useMemo(()=> generateHalfHourSlots(hours), [hours]);
   const dow = DOW[dateObj.getDay()];
+  const isToday = selDate === fmtDate(new Date());
+  const nowTop = useNowLineTop(wrapRef, tbodyRef, hours, isToday);
 
   function findRes(room, time){
     const s = toMin(time), e = s+30;
@@ -1656,7 +1688,7 @@ function StudentTimetableTab({ student, blocks }){
             <div className="legend-item"><div className="legend-dot" style={{background:'var(--surface-3)',border:'1px solid var(--border)'}}/>예약마감</div>
             <div className="legend-item">🔒 이용불가</div>
           </div>
-          <div className="timetable-wrap">
+          <div className="timetable-wrap" ref={wrapRef}>
             <table className="timetable">
               <colgroup>
                 <col style={{width:'56px'}} />
@@ -1668,7 +1700,7 @@ function StudentTimetableTab({ student, blocks }){
                   {availableRooms.map(r=><th key={r}>{roomLabel(r)}</th>)}
                 </tr>
               </thead>
-              <tbody>
+              <tbody ref={tbodyRef}>
                 {slots.map(t=>(
                   <tr key={t}>
                     <td className="tt-time">{t}</td>
@@ -1685,7 +1717,6 @@ function StudentTimetableTab({ student, blocks }){
                             <div className="tt-name" style={mine?{color:'var(--brass-bright)',fontWeight:800}:(showName?{color:'var(--brass-bright)'}:{color:'var(--text-faint)'})}>
                               {mine ? '내 예약' : (showName ? res.studentName : '예약마감')}
                             </div>
-                            {showName && !mine && <div className="tt-type">{res.studentType==='exam'?'입시':'취미'}</div>}
                           </td>
                         );
                       }
@@ -1696,6 +1727,7 @@ function StudentTimetableTab({ student, blocks }){
                 ))}
               </tbody>
             </table>
+            {nowTop!=null && <div className="tt-now-line" style={{top:nowTop}}><span className="tt-now-dot"/></div>}
           </div>
         </React.Fragment>
       )}
@@ -1896,6 +1928,8 @@ function StudentEditModal({ student, onClose }){
    ============================================================ */
 function AdminReservationsTab(){
   const dateScrollRef = useHScroll();
+  const wrapRef = React.useRef(null);
+  const tbodyRef = React.useRef(null);
   const [selDate, setSelDate] = useState(fmtDate(new Date()));
   const [reservations, setReservations] = useState([]);
   const [editing, setEditing] = useState(null);
@@ -1916,6 +1950,8 @@ function AdminReservationsTab(){
   const dateObj = useMemo(()=> new Date(selDate+'T00:00:00'), [selDate]);
   const hours = useMemo(()=> getOperatingHours(dateObj), [dateObj]);
   const slots = useMemo(()=> generateHalfHourSlots(hours), [hours]);
+  const isToday = selDate === fmtDate(new Date());
+  const nowTop = useNowLineTop(wrapRef, tbodyRef, hours, isToday);
 
   function findRes(room, time){
     const s = toMin(time), e = s+30;
@@ -1944,7 +1980,7 @@ function AdminReservationsTab(){
       {!hours ? (
         <div className="info-box">일요일은 학원 휴무일이에요.</div>
       ) : (
-        <div className="timetable-wrap">
+        <div className="timetable-wrap" ref={wrapRef}>
           <table className="timetable">
             <colgroup>
               <col style={{width:'56px'}} />
@@ -1956,7 +1992,7 @@ function AdminReservationsTab(){
                 {ROOMS.map(r=><th key={r}>{roomLabel(r)}</th>)}
               </tr>
             </thead>
-            <tbody>
+            <tbody ref={tbodyRef}>
               {slots.map(t=>(
                 <tr key={t}>
                   <td className="tt-time">{t}</td>
@@ -1977,6 +2013,7 @@ function AdminReservationsTab(){
               ))}
             </tbody>
           </table>
+          {nowTop!=null && <div className="tt-now-line" style={{top:nowTop}}><span className="tt-now-dot"/></div>}
         </div>
       )}
       {editing && <ReservationEditModal reservation={editing} onClose={()=>setEditing(null)} />}
@@ -2646,7 +2683,7 @@ function AdminShell({ onLogout }){
   const tabs = [
     { key:'students', label:'학생', icon:<Icon.user/> },
     { key:'timetable', label:'시간표', icon:<Icon.clock/> },
-    { key:'reservations', label:'일정', icon:<Icon.cal/> },
+    { key:'reservations', label:'일정표', icon:<Icon.cal/> },
     { key:'blocks', label:'차단', icon:<Icon.lock/> },
     { key:'notices', label:'공지', icon:<Icon.bell/> },
   ];
