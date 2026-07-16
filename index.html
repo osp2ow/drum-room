@@ -2099,6 +2099,8 @@ function AdminCellModal({ cell, selDate, dow, onClose }){
   const [saving, setSaving] = useState(false);
   const [students, setStudents] = useState([]);
   const [studentId, setStudentId] = useState('');
+  const [studentFilter, setStudentFilter] = useState('all'); // all | hobby | exam
+  const [studentSearch, setStudentSearch] = useState('');
   const [start, setStart] = useState(time);
   const [end, setEnd] = useState(toTime(Math.min(toMin(time)+60, 22*60)));
   const [blockEnd, setBlockEnd] = useState(toTime(Math.min(toMin(time)+60, 22*60)));
@@ -2109,6 +2111,11 @@ function AdminCellModal({ cell, selDate, dow, onClose }){
     });
     return ()=>unsub();
   }, []);
+
+  const filteredStudents = students.filter(s=>
+    (studentFilter==='all' || s.type===studentFilter) &&
+    (studentSearch.trim()==='' || s.name.includes(studentSearch.trim()))
+  );
 
   const timeOptions = useMemo(()=>{
     const opts = [];
@@ -2178,9 +2185,15 @@ function AdminCellModal({ cell, selDate, dow, onClose }){
         ) : mode==='reserve' ? (
           <React.Fragment>
             <div className="input-label">학생</div>
+            <div className="toggle-row" style={{marginBottom:10}}>
+              <div className={"toggle-opt"+(studentFilter==='all'?' active':'')} onClick={()=>setStudentFilter('all')}>전체</div>
+              <div className={"toggle-opt"+(studentFilter==='hobby'?' active':'')} onClick={()=>setStudentFilter('hobby')}>취미생</div>
+              <div className={"toggle-opt"+(studentFilter==='exam'?' active':'')} onClick={()=>setStudentFilter('exam')}>입시생</div>
+            </div>
+            <input className="input" placeholder="이름 검색" value={studentSearch} onChange={e=>setStudentSearch(e.target.value)} style={{marginBottom:10}} />
             <select className="input" value={studentId} onChange={e=>setStudentId(e.target.value)} style={{marginBottom:12}}>
-              <option value="">학생 선택</option>
-              {students.map(s=><option key={s.id} value={s.id}>{s.name} ({s.type==='exam'?'입시':'취미'})</option>)}
+              <option value="">학생 선택 ({filteredStudents.length}명)</option>
+              {filteredStudents.map(s=><option key={s.id} value={s.id}>{s.name} ({s.type==='exam'?'입시':'취미'})</option>)}
             </select>
             <div className="input-label">시간</div>
             <div className="mini-add-row" style={{marginBottom:10}}>
