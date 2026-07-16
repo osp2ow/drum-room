@@ -1644,31 +1644,83 @@ function StatusTab({ student, blocks }){
   );
 }
 
+function MonthlyStatsModal({ reservations, onClose }){
+  const months = useMemo(()=>{
+    const arr = [];
+    const now = new Date();
+    for(let i=5; i>=0; i--){
+      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      const ym = `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+      const minutes = reservations
+        .filter(r=> r.date && r.date.startsWith(ym))
+        .reduce((sum,r)=> sum + (toMin(r.end)-toMin(r.start)), 0);
+      arr.push({ label: `${d.getMonth()+1}월`, hours: Math.round((minutes/60)*10)/10, isCurrent: i===0 });
+    }
+    return arr;
+  }, [reservations]);
+
+  const maxHours = Math.max(1, ...months.map(m=>m.hours));
+  const chartH = 140;
+  const barW = 34;
+  const gap = 18;
+  const chartW = months.length * (barW + gap);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div className="modal-close-row">
+          <div className="modal-title">월별 연습시간</div>
+          <div className="icon-btn" onClick={onClose}>✕</div>
+        </div>
+        <p style={{fontSize:12,color:'var(--text-muted)',marginTop:0,marginBottom:18}}>최근 6개월간 예약해서 사용한 연습실 시간 합계예요.</p>
+
+        <div style={{overflowX:'auto'}}>
+          <svg width={chartW} height={chartH+34} viewBox={`0 0 ${chartW} ${chartH+34}`}>
+            {months.map((m,i)=>{
+              const h = maxHours>0 ? (m.hours/maxHours)*chartH : 0;
+              const x = i*(barW+gap) + gap/2;
+              const y = chartH - h;
+              return (
+                <g key={i}>
+                  <rect x={x} y={y} width={barW} height={Math.max(h,2)} rx="7"
+                    fill={m.isCurrent ? '#2FBFAF' : 'rgba(47,191,175,0.35)'} />
+                  <text x={x+barW/2} y={y-8} textAnchor="middle" fontSize="11" fontWeight="700"
+                    fill={m.isCurrent ? '#17968A' : '#5C6E6C'}>{m.hours}h</text>
+                  <text x={x+barW/2} y={chartH+22} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#1E2B2A">{m.label}</text>
+                </g>
+              );
+            })}
+            <line x1="0" y1={chartH} x2={chartW} y2={chartH} stroke="#DCE7E6" strokeWidth="1" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ============================================================
    STUDENT: MY TAB
    ============================================================ */
 function MyTab({ student, notices, onLogout }){
   const [selectedNotice, setSelectedNotice] = useState(null);
-  const [monthlyMinutes, setMonthlyMinutes] = useState(0);
+  const [examReservations, setExamReservations] = useState([]);
+  const [showStats, setShowStats] = useState(false);
 
   useEffect(()=>{
     if(student.type !== 'exam') return;
     const unsub = db.collection(COL_RESERVATIONS).where('studentId','==',student.id).onSnapshot(snap=>{
-      const now = new Date();
-      const ym = `${now.getFullYear()}-${pad(now.getMonth()+1)}`;
-      let total = 0;
-      snap.docs.forEach(doc=>{
-        const r = doc.data();
-        if(r.date && r.date.startsWith(ym)){
-          total += (toMin(r.end) - toMin(r.start));
-        }
-      });
-      setMonthlyMinutes(total);
+      setExamReservations(snap.docs.map(d=>d.data()));
     });
     return ()=>unsub();
   }, [student.id, student.type]);
 
-  const thisMonth = new Date().getMonth() + 1;
+  const now = new Date();
+  const thisMonth = now.getMonth() + 1;
+  const thisYm = `${now.getFullYear()}-${pad(thisMonth)}`;
+  const monthlyMinutes = examReservations
+    .filter(r=> r.date && r.date.startsWith(thisYm))
+    .reduce((sum,r)=> sum + (toMin(r.end)-toMin(r.start)), 0);
   const monthlyHours = Math.floor(monthlyMinutes / 60);
   const monthlyRemMin = monthlyMinutes % 60;
 
@@ -1687,13 +1739,15 @@ function MyTab({ student, notices, onLogout }){
       </div>
 
       {student.type==='exam' && (
-        <div className="card">
+        <div className="card" onClick={()=>setShowStats(true)} style={{cursor:'pointer'}}>
           <div className="card-title">📊 이번달 연습시간</div>
-          <div style={{fontFamily:'var(--font-display)',fontWeight:800,fontSize:24,color:'var(--brass-bright)'}}>
+          <div style={{fontFamily:'var(--font-body)',fontWeight:500,fontSize:15,color:'var(--brass-bright)'}}>
             {thisMonth}월 총 연습시간 {monthlyHours}시간{monthlyRemMin>0?` ${monthlyRemMin}분`:''}
           </div>
+          <div style={{fontSize:11,color:'var(--text-faint)',marginTop:6}}>눌러서 월별 그래프 보기 →</div>
         </div>
       )}
+      {showStats && <MonthlyStatsModal reservations={examReservations} onClose={()=>setShowStats(false)} />}
 
       <div className="card-title" style={{margin:'6px 0 12px'}}>📢 학원 공지사항</div>
       <NoticeList notices={notices} onSelect={setSelectedNotice} />
