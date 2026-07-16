@@ -963,7 +963,7 @@ function HomeTab({ student, notices, onGoReserve }){
         {makeupItems.length > 0 && (
           <div className="hero-makeup-line">
             {makeupItems.map((m,i)=>(
-              <span key={i} className="hero-makeup-badge">🔵 {m.day}요일 {hourLabel12(m.start)} 보강수업</span>
+              <span key={i} className="hero-makeup-badge">🔵 {(()=>{ const d = new Date(m.date+'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일 ${m.day}요일`; })()} {hourLabel12(m.start)} 보강수업</span>
             ))}
           </div>
         )}
