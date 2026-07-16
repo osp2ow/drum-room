@@ -916,9 +916,9 @@ function HomeTab({ student, notices, onGoReserve }){
   const [makeupItems, setMakeupItems] = useState([]);
   useEffect(()=>{
     const unsub = db.collection(COL_OVERRIDES).where('studentId','==',student.id).onSnapshot(snap=>{
-      const todayStr = fmtDate(new Date());
-      const maxStr = fmtDate(addDays(new Date(), 13)); // 이번주 + 다음주까지 표시
-      const items = snap.docs.map(d=>d.data()).filter(o=> o.kind==='makeup' && o.date>=todayStr && o.date<=maxStr);
+      const minStr = fmtDate(getMonday(0)); // 이번주 월요일부터 (오늘 이전이라도 이번주면 표시)
+      const maxStr = fmtDate(addDays(getMonday(0), 11)); // 다음주 금요일까지
+      const items = snap.docs.map(d=>d.data()).filter(o=> o.kind==='makeup' && o.date>=minStr && o.date<=maxStr);
       items.sort((a,b)=> a.date<b.date?-1:1);
       setMakeupItems(items);
     });
