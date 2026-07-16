@@ -326,7 +326,6 @@
   .tt-cell.absent{background:var(--rec);cursor:pointer;}
   .tt-cell.taken{background:var(--surface-3);}
   .tt-cell.mine-res{background:rgba(47,191,175,0.45);}
-  .tt-cell.peer-res{background:var(--brass-soft);}
   .tt-cell.makeup{background:#2E6FE8;cursor:pointer;}
   .tt-cell.booked:active{filter:brightness(0.95);}
   .tt-name{font-size:12px;font-weight:800;color:var(--brass-bright);line-height:1.3;}
@@ -1711,10 +1710,10 @@ function StudentTimetableTab({ student, blocks }){
                         const span = (toMin(res.end)-toMin(res.start))/30;
                         const mine = res.studentId === student.id;
                         const showName = mine || (student.type==='exam' && res.studentType==='exam');
-                        const cls = mine ? 'mine-res' : (showName ? 'peer-res' : 'taken');
+                        const cls = mine ? 'mine-res' : 'taken';
                         return (
                           <td key={r} className={"tt-cell "+cls} rowSpan={span}>
-                            <div className="tt-name" style={mine?{color:'var(--brass-bright)',fontWeight:800}:(showName?{color:'var(--brass-bright)'}:{color:'var(--text-faint)'})}>
+                            <div className="tt-name" style={mine?{color:'var(--brass-bright)',fontWeight:800}:{color:'var(--text-faint)'}}>
                               {mine ? '내 예약' : (showName ? res.studentName : '예약마감')}
                             </div>
                           </td>
