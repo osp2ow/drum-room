@@ -340,10 +340,11 @@
   .timetable tr:last-child .tt-cell,
   .timetable tr:last-child .tt-time{border-bottom:none;}
   .tt-cell.empty{color:var(--text-faint);font-size:11px;}
+  .tt-cell.blocked-cell{background:var(--surface-3);color:var(--text-faint);font-size:13px;}
   .tt-cell.booked{background:var(--brass-soft);cursor:pointer;}
   .tt-cell.absent{background:var(--rec);cursor:pointer;}
   .tt-cell.taken{background:var(--surface-3);border-bottom:1.5px solid #CFE0DD;border-right:1.5px solid #CFE0DD;}
-  .tt-cell.mine-res{background:rgba(47,191,175,0.38);border:1.5px solid var(--brass);}
+  .tt-cell.mine-res{background:var(--brass);border:1.5px solid var(--brass);}
   .tt-cell.makeup{background:#2E6FE8;cursor:pointer;}
   .tt-cell.booked:active{filter:brightness(0.95);}
   .tt-name{font-size:12px;font-weight:800;color:var(--brass-bright);line-height:1.3;}
@@ -1764,7 +1765,7 @@ function StudentTimetableTab({ student, blocks }){
                         const cls = mine ? 'mine-res' : 'taken';
                         return (
                           <td key={r} className={"tt-cell "+cls} rowSpan={span}>
-                            <div className="tt-name" style={mine?{color:'var(--brass-bright)',fontWeight:800}:{color:'var(--text-faint)'}}>
+                            <div className="tt-name" style={mine?{color:'#FFFFFF',fontWeight:800}:{color:'var(--text-faint)'}}>
                               {mine ? '내 예약' : (showName ? res.studentName : '예약마감')}
                             </div>
                           </td>
@@ -1982,7 +1983,9 @@ function AdminReservationsTab(){
   const tbodyRef = React.useRef(null);
   const [selDate, setSelDate] = useState(fmtDate(new Date()));
   const [reservations, setReservations] = useState([]);
+  const [blocks, setBlocks] = useState([]);
   const [editing, setEditing] = useState(null);
+  const [cellModal, setCellModal] = useState(null);
 
   useEffect(()=>{
     const unsub = db.collection(COL_RESERVATIONS).where('date','==',selDate).onSnapshot(snap=>{
@@ -1990,6 +1993,13 @@ function AdminReservationsTab(){
     });
     return ()=>unsub();
   }, [selDate]);
+
+  useEffect(()=>{
+    const unsub = db.collection(COL_BLOCKS).onSnapshot(snap=>{
+      setBlocks(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return ()=>unsub();
+  }, []);
 
   const dates = useMemo(()=>{
     const arr = []; let d = new Date(); d.setHours(0,0,0,0);
@@ -2002,17 +2012,22 @@ function AdminReservationsTab(){
   const slots = useMemo(()=> generateHalfHourSlots(hours), [hours]);
   const isToday = selDate === fmtDate(new Date());
   const nowTop = useNowLineTop(wrapRef, tbodyRef, hours, isToday);
+  const dow = DOW[dateObj.getDay()];
 
   function findRes(room, time){
     const s = toMin(time), e = s+30;
     return reservations.find(r=> Number(r.room)===room && toMin(r.start)<=s && e<=toMin(r.end)) || null;
+  }
+  function findBlock(room, time){
+    const s = toMin(time), e = s+30;
+    return blocks.find(b=> Number(b.room)===room && b.day===dow && toMin(b.start)<=s && e<=toMin(b.end)) || null;
   }
 
   return (
     <div className="screen">
       <div className="eyebrow">ADMIN</div>
       <h1 className="page-title">예약 일정표</h1>
-      <p className="page-sub">날짜를 고르면 전체 방의 예약 현황을 한눈에 볼 수 있어요. 예약 칸을 눌러서 수정·취소할 수 있어요.</p>
+      <p className="page-sub">날짜를 고르면 전체 방의 예약 현황을 한눈에 볼 수 있어요. 칸을 눌러서 예약 수정·추가, 차단 추가·해제를 할 수 있어요.</p>
       <div className="date-scroll" ref={dateScrollRef}>
         {dates.map(d=>{
           const ds = fmtDate(d);
@@ -2057,7 +2072,13 @@ function AdminReservationsTab(){
                         </td>
                       );
                     }
-                    return <td key={r} className="tt-cell empty">·</td>;
+                    const blk = findBlock(r, t);
+                    if(blk){
+                      return (
+                        <td key={r} className="tt-cell blocked-cell" style={{cursor:'pointer'}} onClick={()=>setCellModal({room:r, time:t, block:blk})}>🔒</td>
+                      );
+                    }
+                    return <td key={r} className="tt-cell empty" style={{cursor:'pointer'}} onClick={()=>setCellModal({room:r, time:t, block:null})}>·</td>;
                   })}
                 </tr>
               ))}
@@ -2067,6 +2088,125 @@ function AdminReservationsTab(){
         </div>
       )}
       {editing && <ReservationEditModal reservation={editing} onClose={()=>setEditing(null)} />}
+      {cellModal && <AdminCellModal cell={cellModal} selDate={selDate} dow={dow} onClose={()=>setCellModal(null)} />}
+    </div>
+  );
+}
+
+function AdminCellModal({ cell, selDate, dow, onClose }){
+  const { room, time, block } = cell;
+  const [mode, setMode] = useState(null); // null | 'reserve' | 'block'
+  const [saving, setSaving] = useState(false);
+  const [students, setStudents] = useState([]);
+  const [studentId, setStudentId] = useState('');
+  const [start, setStart] = useState(time);
+  const [end, setEnd] = useState(toTime(Math.min(toMin(time)+60, 22*60)));
+  const [blockEnd, setBlockEnd] = useState(toTime(Math.min(toMin(time)+60, 22*60)));
+
+  useEffect(()=>{
+    const unsub = db.collection(COL_STUDENTS).orderBy('name').onSnapshot(snap=>{
+      setStudents(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return ()=>unsub();
+  }, []);
+
+  const timeOptions = useMemo(()=>{
+    const opts = [];
+    let cur = toMin(time)+30;
+    while(cur <= 22*60){ opts.push(toTime(cur)); cur += 30; }
+    return opts;
+  }, [time]);
+
+  const dateObj = new Date(selDate+'T00:00:00');
+  const dateLabel = `${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 (${dow}) ${time}`;
+
+  async function unblock(){
+    if(!window.confirm('이 차단을 해제할까요?')) return;
+    setSaving(true);
+    try{ await db.collection(COL_BLOCKS).doc(block.id).delete(); onClose(); }
+    catch(e){ alert('차단 해제 중 오류가 발생했어요.'); setSaving(false); }
+  }
+
+  async function addReservation(){
+    const student = students.find(s=>s.id===studentId);
+    if(!student){ alert('학생을 선택해주세요.'); return; }
+    if(toMin(end) <= toMin(start)){ alert('종료 시간이 시작 시간보다 늦어야 해요.'); return; }
+    setSaving(true);
+    try{
+      await db.collection(COL_RESERVATIONS).add({
+        studentId: student.id, studentName: student.name, studentType: student.type,
+        room: Number(room), date: selDate, start, end,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      onClose();
+    }catch(e){ alert('예약 추가 중 오류가 발생했어요.'); setSaving(false); }
+  }
+
+  async function addBlock(){
+    if(toMin(blockEnd) <= toMin(time)){ alert('종료 시간이 시작 시간보다 늦어야 해요.'); return; }
+    setSaving(true);
+    try{
+      await db.collection(COL_BLOCKS).add({
+        day: dow, room: Number(room), start: time, end: blockEnd, note: '',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      onClose();
+    }catch(e){ alert('차단 추가 중 오류가 발생했어요.'); setSaving(false); }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div className="modal-close-row">
+          <div className="modal-title">{roomFullLabel(room)} · {dateLabel}</div>
+          <div className="icon-btn" onClick={onClose}>✕</div>
+        </div>
+
+        {block ? (
+          <React.Fragment>
+            <p style={{fontSize:12.5,color:'var(--text-muted)',marginTop:0,marginBottom:16,lineHeight:1.6}}>
+              매주 {block.day}요일 {block.start}~{block.end} 차단되어 있어요.{block.note ? ` (${block.note})` : ''}
+            </p>
+            <button className="btn btn-danger" disabled={saving} onClick={unblock}>{saving?'처리 중...':'차단 해제'}</button>
+          </React.Fragment>
+        ) : mode===null ? (
+          <div className="toggle-row" style={{marginBottom:4}}>
+            <div className="toggle-opt" onClick={()=>setMode('reserve')}>예약 추가</div>
+            <div className="toggle-opt" onClick={()=>setMode('block')}>차단 추가</div>
+          </div>
+        ) : mode==='reserve' ? (
+          <React.Fragment>
+            <div className="input-label">학생</div>
+            <select className="input" value={studentId} onChange={e=>setStudentId(e.target.value)} style={{marginBottom:12}}>
+              <option value="">학생 선택</option>
+              {students.map(s=><option key={s.id} value={s.id}>{s.name} ({s.type==='exam'?'입시':'취미'})</option>)}
+            </select>
+            <div className="input-label">시간</div>
+            <div className="mini-add-row" style={{marginBottom:10}}>
+              <select className="input" value={start} onChange={e=>setStart(e.target.value)}>
+                <option value={time}>{time}</option>
+              </select>
+              <select className="input" value={end} onChange={e=>setEnd(e.target.value)}>
+                {timeOptions.map(h=><option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+            <p style={{fontSize:11.5,color:'var(--brass-bright)',marginBottom:14,lineHeight:1.5}}>관리자가 직접 넣는 예약은 학생별 시간 제한 규칙과 상관없이 등록돼요.</p>
+            <button className="btn" disabled={saving} onClick={addReservation}>{saving?'저장 중...':'예약 추가하기'}</button>
+          </React.Fragment>
+        ) : (
+          <React.Fragment>
+            <div className="input-label">차단 시간 (매주 {dow}요일 반복)</div>
+            <div className="mini-add-row" style={{marginBottom:14}}>
+              <div className="input" style={{textAlign:'center'}}>{time}</div>
+              <select className="input" value={blockEnd} onChange={e=>setBlockEnd(e.target.value)}>
+                {timeOptions.map(h=><option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+            <button className="btn" disabled={saving} onClick={addBlock}>{saving?'저장 중...':'차단 추가하기'}</button>
+          </React.Fragment>
+        )}
+      </div>
     </div>
   );
 }
