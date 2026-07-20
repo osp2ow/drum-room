@@ -235,6 +235,7 @@
   .hero-schedule-line{font-family:var(--font-display);font-size:15.5px;font-weight:500;letter-spacing:-0.01em;color:#FFFFFF;margin-top:9px;line-height:1.4;}
   .hero-makeup-line{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
   .hero-makeup-badge{background:rgba(255,255,255,0.92);color:#2E6FE8;font-size:11.5px;font-weight:800;padding:5px 11px;border-radius:100px;white-space:nowrap;}
+  .hero-absence-badge{background:rgba(255,255,255,0.92);color:#E0393E;font-size:11.5px;font-weight:800;padding:5px 11px;border-radius:100px;white-space:nowrap;}
   .student-suggest-list{border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px;background:var(--surface);}
   .student-suggest-item{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13.5px;font-weight:600;}
   .student-suggest-item:last-child{border-bottom:none;}
@@ -583,6 +584,10 @@ function withTimeout(promise, ms=12000){
 }
 
 const ADMIN_PASSWORD = "admin6537"; // 원장님 비밀번호 - 원하는 값으로 변경하세요
+// 담당 학생이 다른 선생님 계정. 아이디+비밀번호로 로그인하며, 아래 tabs에 적힌 화면만 볼 수 있어요.
+const TEACHER_ACCOUNTS = [
+  { id: "김믿음", password: "9095", tabs: ['students','timetable','reservations','blocks'] },
+];
 
 const COL_STUDENTS = "juniper_students";
 const COL_RESERVATIONS = "juniper_reservations";
@@ -899,13 +904,22 @@ function AuthScreen({ onStudentLogin, onGoAdmin }){
 }
 
 function AdminLoginScreen({ onAdminLogin, onBack }){
+  const [id, setId] = useState('');
   const [pw, setPw] = useState('');
   const [err, setErr] = useState('');
   function submit(){
-    if(pw === ADMIN_PASSWORD){
-      localStorage.setItem('juniper_session', JSON.stringify({ type:'admin' }));
-      onAdminLogin();
-    } else setErr('비밀번호가 일치하지 않아요.');
+    if(!id.trim() && pw === ADMIN_PASSWORD){
+      localStorage.setItem('juniper_session', JSON.stringify({ type:'admin', tabs:null }));
+      onAdminLogin(null);
+      return;
+    }
+    const teacher = TEACHER_ACCOUNTS.find(t=>t.id===id.trim() && t.password===pw);
+    if(teacher){
+      localStorage.setItem('juniper_session', JSON.stringify({ type:'admin', tabs: teacher.tabs }));
+      onAdminLogin(teacher.tabs);
+      return;
+    }
+    setErr('아이디 또는 비밀번호가 일치하지 않아요.');
   }
   return (
     <div className="auth-wrap">
@@ -916,7 +930,11 @@ function AdminLoginScreen({ onAdminLogin, onBack }){
       </div>
       {err && <div className="error-box">{err}</div>}
       <div className="input-group">
-        <label className="input-label">관리자 비밀번호</label>
+        <label className="input-label">아이디 (원장님은 비워두세요)</label>
+        <input className="input" value={id} onChange={e=>setId(e.target.value)} />
+      </div>
+      <div className="input-group">
+        <label className="input-label">비밀번호</label>
         <input className="input" type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} />
       </div>
       <button className="btn" onClick={submit}>로그인</button>
@@ -960,13 +978,16 @@ function HomeTab({ student, notices, onGoReserve }){
   }, [student.id]);
 
   const [makeupItems, setMakeupItems] = useState([]);
+  const [absenceItems, setAbsenceItems] = useState([]);
   useEffect(()=>{
     const unsub = db.collection(COL_OVERRIDES).where('studentId','==',student.id).onSnapshot(snap=>{
       const minStr = fmtDate(getMonday(0)); // 이번주 월요일부터 (오늘 이전이라도 이번주면 표시)
       const maxStr = fmtDate(addDays(getMonday(0), 11)); // 다음주 금요일까지
-      const items = snap.docs.map(d=>d.data()).filter(o=> o.kind==='makeup' && o.date>=minStr && o.date<=maxStr);
-      items.sort((a,b)=> a.date<b.date?-1:1);
-      setMakeupItems(items);
+      const all = snap.docs.map(d=>d.data()).filter(o=> o.date>=minStr && o.date<=maxStr);
+      const mk = all.filter(o=>o.kind==='makeup'); mk.sort((a,b)=> a.date<b.date?-1:1);
+      const ab = all.filter(o=>o.kind==='absence'); ab.sort((a,b)=> a.date<b.date?-1:1);
+      setMakeupItems(mk);
+      setAbsenceItems(ab);
     });
     return ()=>unsub();
   }, [student.id]);
@@ -1010,6 +1031,13 @@ function HomeTab({ student, notices, onGoReserve }){
           <div className="hero-makeup-line">
             {makeupItems.map((m,i)=>(
               <span key={i} className="hero-makeup-badge">🔵 {(()=>{ const d = new Date(m.date+'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일 ${m.day}요일`; })()} {hourLabel12(m.start)} 보강수업</span>
+            ))}
+          </div>
+        )}
+        {absenceItems.length > 0 && (
+          <div className="hero-makeup-line">
+            {absenceItems.map((a,i)=>(
+              <span key={i} className="hero-absence-badge">🔴 {(()=>{ const d = new Date(a.date+'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일 ${a.day}요일`; })()} {hourLabel12(a.start)} 결석</span>
             ))}
           </div>
         )}
