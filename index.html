@@ -584,10 +584,13 @@ function withTimeout(promise, ms=12000){
 }
 
 const ADMIN_PASSWORD = "admin6537"; // 원장님 비밀번호 - 원하는 값으로 변경하세요
+const MAIN_TEACHER_ID = "admin";
 // 담당 학생이 다른 선생님 계정. 아이디+비밀번호로 로그인하며, 아래 tabs에 적힌 화면만 볼 수 있어요.
 const TEACHER_ACCOUNTS = [
-  { id: "김믿음", password: "9095", tabs: ['students','timetable','reservations','blocks'] },
+  { id: "김믿음", password: "9095", tabs: ['students','timetable','reservations','blocks'], teacherId: "김믿음" },
 ];
+const TEACHER_LABELS = { [MAIN_TEACHER_ID]: '원장님', '김믿음': '김믿음 선생님' };
+function teacherLabel(tid){ return TEACHER_LABELS[tid || MAIN_TEACHER_ID] || tid; }
 
 const COL_STUDENTS = "juniper_students";
 const COL_RESERVATIONS = "juniper_reservations";
@@ -909,14 +912,14 @@ function AdminLoginScreen({ onAdminLogin, onBack }){
   const [err, setErr] = useState('');
   function submit(){
     if(id.trim()==='admin' && pw === ADMIN_PASSWORD){
-      localStorage.setItem('juniper_session', JSON.stringify({ type:'admin', tabs:null }));
-      onAdminLogin(null);
+      localStorage.setItem('juniper_session', JSON.stringify({ type:'admin', tabs:null, teacherId: MAIN_TEACHER_ID }));
+      onAdminLogin({ tabs:null, teacherId: MAIN_TEACHER_ID });
       return;
     }
     const teacher = TEACHER_ACCOUNTS.find(t=>t.id===id.trim() && t.password===pw);
     if(teacher){
-      localStorage.setItem('juniper_session', JSON.stringify({ type:'admin', tabs: teacher.tabs }));
-      onAdminLogin(teacher.tabs);
+      localStorage.setItem('juniper_session', JSON.stringify({ type:'admin', tabs: teacher.tabs, teacherId: teacher.teacherId }));
+      onAdminLogin({ tabs: teacher.tabs, teacherId: teacher.teacherId });
       return;
     }
     setErr('아이디 또는 비밀번호가 일치하지 않아요.');
@@ -2057,10 +2060,11 @@ function StudentShell({ student, onLogout }){
 /* ============================================================
    ADMIN: STUDENTS TAB
    ============================================================ */
-function AdminStudentsTab(){
+function AdminStudentsTab({ teacherId }){
   const [students, setStudents] = useState([]);
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState(null); // student obj or null
+  const myTeacherId = teacherId || MAIN_TEACHER_ID;
 
   useEffect(()=>{
     const unsub = db.collection(COL_STUDENTS).orderBy('name').onSnapshot(snap=>{
@@ -2070,29 +2074,48 @@ function AdminStudentsTab(){
   }, []);
 
   const filtered = students.filter(s => s.name.includes(q.trim()));
+  const mine = filtered.filter(s => (s.teacherId || MAIN_TEACHER_ID) === myTeacherId);
+  const others = filtered.filter(s => (s.teacherId || MAIN_TEACHER_ID) !== myTeacherId);
+
+  function StudentRow({ s }){
+    return (
+      <div className="list-item-row" key={s.id} onClick={()=>setEditing(s)}>
+        <div>
+          <div className="name">{s.name}</div>
+          <div className="meta">{(s.schedule||[]).length}개 수업 · {s.phoneLast4}</div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span className={"tag "+(s.type==='exam'?'tag-exam':'tag-hobby')}>{s.type==='exam'?'입시생':'취미생'}</span>
+          <span className="chev">›</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="screen">
       <div className="eyebrow">ADMIN</div>
       <h1 className="page-title">학생 관리</h1>
-      <p className="page-sub">총 {students.length}명 등록됨</p>
+      <p className="page-sub">총 {students.length}명 등록됨 · {teacherLabel(myTeacherId)} 담당 {mine.length}명</p>
       <div className="search-input-wrap">
         <input className="input" placeholder="이름으로 검색" value={q} onChange={e=>setQ(e.target.value)} />
       </div>
       {filtered.length===0 ? (
         <div className="empty-state"><p>등록된 학생이 없어요.</p></div>
-      ) : filtered.map(s=>(
-        <div className="list-item-row" key={s.id} onClick={()=>setEditing(s)}>
-          <div>
-            <div className="name">{s.name}</div>
-            <div className="meta">{(s.schedule||[]).length}개 수업 · {s.phoneLast4}</div>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <span className={"tag "+(s.type==='exam'?'tag-exam':'tag-hobby')}>{s.type==='exam'?'입시생':'취미생'}</span>
-            <span className="chev">›</span>
-          </div>
-        </div>
-      ))}
+      ) : (
+        <React.Fragment>
+          {mine.length===0 ? (
+            <div className="empty-state"><p>내 담당 학생이 없어요.</p></div>
+          ) : mine.map(s=><StudentRow s={s} key={s.id} />)}
+
+          {others.length > 0 && (
+            <React.Fragment>
+              <div className="card-title" style={{margin:'22px 0 12px',color:'var(--text-faint)'}}>다른 선생님 담당 학생 ({others.length}명)</div>
+              {others.map(s=><StudentRow s={s} key={s.id} />)}
+            </React.Fragment>
+          )}
+        </React.Fragment>
+      )}
       {editing && <StudentEditModal student={editing} onClose={()=>setEditing(null)} />}
     </div>
   );
@@ -2100,6 +2123,7 @@ function AdminStudentsTab(){
 
 function StudentEditModal({ student, onClose }){
   const [type, setTypeState] = useState(student.type);
+  const [teacherId, setTeacherIdState] = useState(student.teacherId || MAIN_TEACHER_ID);
   const [schedule, setSchedule] = useState(student.schedule || []);
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState('');
@@ -2124,6 +2148,13 @@ function StudentEditModal({ student, onClose }){
     setTypeState(t);
     setSaving(true);
     try{ await db.collection(COL_STUDENTS).doc(student.id).update({ type: t }); flashSaved('✓ 수강 유형이 저장됐어요.'); }
+    catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
+    setSaving(false);
+  }
+  async function chooseTeacher(tid){
+    setTeacherIdState(tid);
+    setSaving(true);
+    try{ await db.collection(COL_STUDENTS).doc(student.id).update({ teacherId: tid }); flashSaved('✓ 담당 선생님이 저장됐어요.'); }
     catch(e){ alert('저장 중 오류가 발생했어요. 다시 시도해주세요.'); }
     setSaving(false);
   }
@@ -2162,6 +2193,14 @@ function StudentEditModal({ student, onClose }){
         ) : (
           <p style={{fontSize:11.5,color:'var(--text-faint)',marginTop:-8,marginBottom:16}}>{saving ? '저장 중...' : '요일·시간을 바꾸면 바로 저장돼요.'}</p>
         )}
+
+        <div className="input-label">담당 선생님</div>
+        <div className="toggle-row" style={{marginBottom:18}}>
+          <div className={"toggle-opt"+(teacherId===MAIN_TEACHER_ID?' active':'')} onClick={()=>chooseTeacher(MAIN_TEACHER_ID)}>원장님</div>
+          {TEACHER_ACCOUNTS.map(t=>(
+            <div key={t.teacherId} className={"toggle-opt"+(teacherId===t.teacherId?' active':'')} onClick={()=>chooseTeacher(t.teacherId)}>{t.id}</div>
+          ))}
+        </div>
 
         <div className="input-label">수강 유형</div>
         <div className="toggle-row" style={{marginBottom:18}}>
@@ -2829,19 +2868,23 @@ function getMonday(offsetWeeks){
   return addDays(d, diff);
 }
 
-function AdminTimetableTab(){
+function AdminTimetableTab({ teacherId }){
   const wrapRef = React.useRef(null);
   const tbodyRef = React.useRef(null);
-  const [students, setStudents] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
   const [overrides, setOverrides] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
+  const myTeacherId = teacherId || MAIN_TEACHER_ID;
 
   useEffect(()=>{
     const unsub = db.collection(COL_STUDENTS).orderBy('name').onSnapshot(snap=>{
-      setStudents(snap.docs.map(d=>({id:d.id,...d.data()})));
+      setAllStudents(snap.docs.map(d=>({id:d.id,...d.data()})));
     });
     return ()=>unsub();
   }, []);
+
+  const students = useMemo(()=> allStudents.filter(s=> (s.teacherId || MAIN_TEACHER_ID) === myTeacherId), [allStudents, myTeacherId]);
+  const myStudentIds = useMemo(()=> new Set(students.map(s=>s.id)), [students]);
 
   const DAYS = ['월','화','수','목','금'];
   const HOURS = CLASS_HOURS; // 12:00 ~ 21:00 (시작 시간 기준)
@@ -2866,6 +2909,8 @@ function AdminTimetableTab(){
     return ()=>unsub();
   }, [rangeStart, rangeEnd]);
 
+  const myOverrides = useMemo(()=> overrides.filter(o=> o.studentId && myStudentIds.has(o.studentId)), [overrides, myStudentIds]);
+
   function findRegular(day, hour){
     const list = [];
     students.forEach(s=>{
@@ -2883,7 +2928,7 @@ function AdminTimetableTab(){
     const regularEntries = findRegular(day, hour);
     const regularIds = regularEntries.map(en=>en.id);
     const absenceOverrides = overrides.filter(o=> o.kind==='absence' && o.start===hour && (o.date===date || o.date===nextDate) && regularIds.includes(o.studentId));
-    const makeupOverrides = overrides.filter(o=>o.kind==='makeup' && o.start===hour && (o.date===date || o.date===nextDate));
+    const makeupOverrides = overrides.filter(o=>o.kind==='makeup' && o.start===hour && (o.date===date || o.date===nextDate) && o.studentId && myStudentIds.has(o.studentId));
     const noteOverride = overrides.find(o=>o.kind==='note' && o.date===date && o.start===hour) || null;
     return { day, dayIdx, date, nextDate, hour, regularEntries, absenceOverrides, makeupOverrides, noteOverride };
   }
@@ -2900,7 +2945,7 @@ function AdminTimetableTab(){
   return (
     <div className="screen" style={{maxWidth:480, margin:'0 auto'}}>
       <div className="eyebrow">ADMIN</div>
-      <h1 className="page-title">수업 시간표</h1>
+      <h1 className="page-title">{teacherLabel(myTeacherId)} 시간표</h1>
 
       <div className="legend" style={{marginBottom:14}}>
         <div className="legend-item"><div className="legend-dot" style={{background:'var(--brass-soft)',border:'1px solid var(--brass)'}}/>정규 수업</div>
@@ -2968,7 +3013,7 @@ function AdminTimetableTab(){
         {nowTop!=null && <div className="tt-now-line" style={{top:nowTop}}><span className="tt-now-dot"/></div>}
       </div>
 
-      {editingCell && <SlotOverrideModal cell={editingCell} students={students} overrides={overrides} onClose={()=>setEditingCell(null)} />}
+      {editingCell && <SlotOverrideModal cell={editingCell} students={students} overrides={myOverrides} onClose={()=>setEditingCell(null)} />}
     </div>
   );
 }
@@ -3151,7 +3196,7 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
 /* ============================================================
    ADMIN SHELL
    ============================================================ */
-function AdminShell({ onLogout, allowedTabs }){
+function AdminShell({ onLogout, allowedTabs, teacherId }){
   const allTabs = [
     { key:'students', label:'학생', icon:<Icon.user/> },
     { key:'timetable', label:'시간표', icon:<Icon.clock/> },
@@ -3169,8 +3214,8 @@ function AdminShell({ onLogout, allowedTabs }){
   return (
     <React.Fragment>
       <AppHeader subtitle="ADMIN MODE" right={<span onClick={onLogout} style={{cursor:'pointer',textDecoration:'underline'}}>로그아웃</span>} />
-      {tabs.some(t=>t.key==='students') && <div style={{display: tab==='students' ? 'block' : 'none'}}><AdminStudentsTab/></div>}
-      {tabs.some(t=>t.key==='timetable') && <div style={{display: tab==='timetable' ? 'block' : 'none'}}><AdminTimetableTab/></div>}
+      {tabs.some(t=>t.key==='students') && <div style={{display: tab==='students' ? 'block' : 'none'}}><AdminStudentsTab teacherId={teacherId}/></div>}
+      {tabs.some(t=>t.key==='timetable') && <div style={{display: tab==='timetable' ? 'block' : 'none'}}><AdminTimetableTab teacherId={teacherId}/></div>}
       {tabs.some(t=>t.key==='reservations') && <div style={{display: tab==='reservations' ? 'block' : 'none'}}><AdminReservationsTab/></div>}
       {tabs.some(t=>t.key==='blocks') && <div style={{display: tab==='blocks' ? 'block' : 'none'}}><AdminBlocksTab/></div>}
       {tabs.some(t=>t.key==='notices') && <div style={{display: tab==='notices' ? 'block' : 'none'}}><AdminNoticesTab/></div>}
@@ -3254,7 +3299,7 @@ function App(){
         const raw = localStorage.getItem('juniper_session');
         if(!raw){ setSession(null); return; }
         const parsed = JSON.parse(raw);
-        if(parsed.type === 'admin'){ setSession({ type:'admin', tabs: parsed.tabs || null }); return; }
+        if(parsed.type === 'admin'){ setSession({ type:'admin', tabs: parsed.tabs || null, teacherId: parsed.teacherId || MAIN_TEACHER_ID }); return; }
         if(parsed.type === 'student' && parsed.studentId){
           const doc = await db.collection(COL_STUDENTS).doc(parsed.studentId).get();
           if(doc.exists){ setSession({ type:'student', student:{ id:doc.id, ...doc.data() } }); return; }
@@ -3295,10 +3340,10 @@ function App(){
     content = <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}><div className="loading-spin"/></div>;
   } else if(session === null){
     content = view === 'adminLogin'
-      ? <AdminLoginScreen onAdminLogin={(tabs)=>setSession({type:'admin', tabs})} onBack={()=>setView('login')} />
+      ? <AdminLoginScreen onAdminLogin={(info)=>setSession({type:'admin', tabs: info?info.tabs:null, teacherId: info?info.teacherId:MAIN_TEACHER_ID})} onBack={()=>setView('login')} />
       : <AuthScreen onStudentLogin={(student)=>setSession({type:'student', student})} onGoAdmin={()=>setView('adminLogin')} />;
   } else if(session.type === 'admin'){
-    content = <AdminShell onLogout={logout} allowedTabs={session.tabs} />;;
+    content = <AdminShell onLogout={logout} allowedTabs={session.tabs} teacherId={session.teacherId} />;;
   } else {
     content = <StudentShell student={session.student} onLogout={logout} />;
   }
