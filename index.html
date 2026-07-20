@@ -908,7 +908,7 @@ function AdminLoginScreen({ onAdminLogin, onBack }){
   const [pw, setPw] = useState('');
   const [err, setErr] = useState('');
   function submit(){
-    if(!id.trim() && pw === ADMIN_PASSWORD){
+    if(id.trim()==='admin' && pw === ADMIN_PASSWORD){
       localStorage.setItem('juniper_session', JSON.stringify({ type:'admin', tabs:null }));
       onAdminLogin(null);
       return;
@@ -930,7 +930,7 @@ function AdminLoginScreen({ onAdminLogin, onBack }){
       </div>
       {err && <div className="error-box">{err}</div>}
       <div className="input-group">
-        <label className="input-label">아이디 (원장님은 비워두세요)</label>
+        <label className="input-label">아이디</label>
         <input className="input" value={id} onChange={e=>setId(e.target.value)} />
       </div>
       <div className="input-group">
