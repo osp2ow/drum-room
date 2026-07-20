@@ -3151,25 +3151,29 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
 /* ============================================================
    ADMIN SHELL
    ============================================================ */
-function AdminShell({ onLogout }){
-  const [tab, setTab] = useState(()=> localStorage.getItem('juniper_admin_tab') || 'students');
-
-  useEffect(()=>{ localStorage.setItem('juniper_admin_tab', tab); }, [tab]);
-  const tabs = [
+function AdminShell({ onLogout, allowedTabs }){
+  const allTabs = [
     { key:'students', label:'학생', icon:<Icon.user/> },
     { key:'timetable', label:'시간표', icon:<Icon.clock/> },
     { key:'reservations', label:'일정표', icon:<Icon.cal/> },
     { key:'blocks', label:'차단', icon:<Icon.lock/> },
     { key:'notices', label:'공지', icon:<Icon.bell/> },
   ];
+  const tabs = allowedTabs ? allTabs.filter(t=>allowedTabs.includes(t.key)) : allTabs;
+  const [tab, setTab] = useState(()=>{
+    const saved = localStorage.getItem('juniper_admin_tab');
+    return (saved && tabs.some(t=>t.key===saved)) ? saved : tabs[0].key;
+  });
+
+  useEffect(()=>{ localStorage.setItem('juniper_admin_tab', tab); }, [tab]);
   return (
     <React.Fragment>
       <AppHeader subtitle="ADMIN MODE" right={<span onClick={onLogout} style={{cursor:'pointer',textDecoration:'underline'}}>로그아웃</span>} />
-      <div style={{display: tab==='students' ? 'block' : 'none'}}><AdminStudentsTab/></div>
-      <div style={{display: tab==='timetable' ? 'block' : 'none'}}><AdminTimetableTab/></div>
-      <div style={{display: tab==='reservations' ? 'block' : 'none'}}><AdminReservationsTab/></div>
-      <div style={{display: tab==='blocks' ? 'block' : 'none'}}><AdminBlocksTab/></div>
-      <div style={{display: tab==='notices' ? 'block' : 'none'}}><AdminNoticesTab/></div>
+      {tabs.some(t=>t.key==='students') && <div style={{display: tab==='students' ? 'block' : 'none'}}><AdminStudentsTab/></div>}
+      {tabs.some(t=>t.key==='timetable') && <div style={{display: tab==='timetable' ? 'block' : 'none'}}><AdminTimetableTab/></div>}
+      {tabs.some(t=>t.key==='reservations') && <div style={{display: tab==='reservations' ? 'block' : 'none'}}><AdminReservationsTab/></div>}
+      {tabs.some(t=>t.key==='blocks') && <div style={{display: tab==='blocks' ? 'block' : 'none'}}><AdminBlocksTab/></div>}
+      {tabs.some(t=>t.key==='notices') && <div style={{display: tab==='notices' ? 'block' : 'none'}}><AdminNoticesTab/></div>}
       <TabBar tabs={tabs} active={tab} onChange={setTab} />
     </React.Fragment>
   );
@@ -3250,7 +3254,7 @@ function App(){
         const raw = localStorage.getItem('juniper_session');
         if(!raw){ setSession(null); return; }
         const parsed = JSON.parse(raw);
-        if(parsed.type === 'admin'){ setSession({ type:'admin' }); return; }
+        if(parsed.type === 'admin'){ setSession({ type:'admin', tabs: parsed.tabs || null }); return; }
         if(parsed.type === 'student' && parsed.studentId){
           const doc = await db.collection(COL_STUDENTS).doc(parsed.studentId).get();
           if(doc.exists){ setSession({ type:'student', student:{ id:doc.id, ...doc.data() } }); return; }
@@ -3291,10 +3295,10 @@ function App(){
     content = <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}><div className="loading-spin"/></div>;
   } else if(session === null){
     content = view === 'adminLogin'
-      ? <AdminLoginScreen onAdminLogin={()=>setSession({type:'admin'})} onBack={()=>setView('login')} />
+      ? <AdminLoginScreen onAdminLogin={(tabs)=>setSession({type:'admin', tabs})} onBack={()=>setView('login')} />
       : <AuthScreen onStudentLogin={(student)=>setSession({type:'student', student})} onGoAdmin={()=>setView('adminLogin')} />;
   } else if(session.type === 'admin'){
-    content = <AdminShell onLogout={logout} />;
+    content = <AdminShell onLogout={logout} allowedTabs={session.tabs} />;;
   } else {
     content = <StudentShell student={session.student} onLogout={logout} />;
   }
