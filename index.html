@@ -2224,6 +2224,7 @@ function StudentEditModal({ student, onClose }){
         ))}
         <button className="btn btn-ghost btn-sm" style={{width:'100%',marginTop:10,marginBottom:20}} disabled={saving} onClick={addSchedule}>+ 수업시간 추가</button>
 
+        <button className="btn" style={{marginBottom:10}} onClick={onClose}>저장</button>
         <button className="btn btn-danger" onClick={del}>학생 삭제</button>
       </div>
     </div>
