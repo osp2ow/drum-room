@@ -604,6 +604,7 @@ const COL_OVERRIDES = "juniper_schedule_overrides";
 const DOW = ['일','월','화','수','목','금','토'];
 const ROOMS = [1,2,3,4];
 const ROOM_LABELS = { 1:'1번', 2:'2번', 3:'3번', 4:'버스킹', 5:'합주실' };
+const RESERVATION_START_DATE = "2026-08-01"; // 이 날짜부터 연습실 예약이 열려요
 function roomLabel(r){ return ROOM_LABELS[Number(r)] || (r+'번'); }
 function roomFullLabel(r){ return (Number(r)===4 || Number(r)===5) ? roomLabel(r) : roomLabel(r)+'방'; }
 function getAvailableRooms(type){ return type === 'exam' ? [1,2,3,4,5] : [1,2,3]; }
@@ -1314,6 +1315,10 @@ function ReserveTab({ student, blocks }){
 
   async function submitAll(){
     if(draftSlots.length===0) return;
+    if(selDate < RESERVATION_START_DATE){
+      setMsg('연습실 예약은 8월 1일부터 열려요.');
+      return;
+    }
     setSubmitting(true); setMsg('');
     try{
       const fresh = await db.collection(COL_RESERVATIONS).where('date','==',selDate).get();
@@ -1418,7 +1423,7 @@ function ReserveTab({ student, blocks }){
           onSelect={(ds)=>setSelDate(ds)} onClose={()=>setShowCalendar(false)} />
       )}
 
-      {selRoom!==5 && (
+      {selRoom!==5 && selDate>=RESERVATION_START_DATE && (
         <div className="budget-bar-wrap">
           <div style={{display:'flex',justifyContent:'space-between',fontSize:'12px',color:'var(--text-muted)'}}>
             <span>오늘 남은 예약 가능 시간{draftSlots.length>0 && ' (선택 반영)'}</span>
@@ -1428,7 +1433,9 @@ function ReserveTab({ student, blocks }){
         </div>
       )}
 
-      {!hours ? (
+      {selDate < RESERVATION_START_DATE ? (
+        <div className="info-box">연습실 예약은 8월 1일부터 열려요. 8월 1일 이후 날짜를 선택해주세요.</div>
+      ) : !hours ? (
         <div className="info-box">{selRoom===5 ? '합주실은 평일에만 이용 가능해요. 다른 날짜를 선택해주세요.' : '일요일은 학원 휴무일이에요. 다른 날짜를 선택해주세요.'}</div>
       ) : (
         <React.Fragment>
