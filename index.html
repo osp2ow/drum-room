@@ -1040,7 +1040,7 @@ function HomeTab({ student, notices, onGoReserve }){
         {absenceItems.length > 0 && (
           <div className="hero-makeup-line">
             {absenceItems.map((a,i)=>(
-              <span key={i} className="hero-absence-badge">🔴 {(()=>{ const d = new Date(a.date+'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일 ${a.day}요일`; })()} {hourLabel12(a.start)} 결석</span>
+              <span key={i} className="hero-absence-badge">🔴 {(()=>{ const d = new Date(a.date+'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일 ${a.day}요일`; })()} {hourLabel12(a.start)} 휴강</span>
             ))}
           </div>
         )}
@@ -2375,9 +2375,14 @@ function AdminCellModal({ cell, selDate, dow, onClose }){
   const [studentId, setStudentId] = useState('');
   const [studentFilter, setStudentFilter] = useState(isEnsemble ? 'exam' : 'all'); // all | hobby | exam
   const [studentSearch, setStudentSearch] = useState('');
-  const [start, setStart] = useState(time);
-  const [end, setEnd] = useState(toTime(Math.min(toMin(time)+60, 22*60)));
+  const [start, setStartState] = useState(time);
+  const [end, setEnd] = useState(toTime(Math.min(toMin(time)+30, 22*60)));
   const [blockEnd, setBlockEnd] = useState(toTime(Math.min(toMin(time)+60, 22*60)));
+
+  function setStart(v){
+    setStartState(v);
+    if(toMin(end) <= toMin(v)) setEnd(toTime(Math.min(toMin(v)+30, 22*60)));
+  }
 
   useEffect(()=>{
     const unsub = db.collection(COL_STUDENTS).orderBy('name').onSnapshot(snap=>{
@@ -2391,12 +2396,19 @@ function AdminCellModal({ cell, selDate, dow, onClose }){
     (studentSearch.trim()==='' || s.name.includes(studentSearch.trim()))
   );
 
+  const startOptions = useMemo(()=>{
+    const opts = [];
+    let cur = 13*60;
+    while(cur <= 21*60+30){ opts.push(toTime(cur)); cur += 30; }
+    return opts;
+  }, []);
+
   const timeOptions = useMemo(()=>{
     const opts = [];
-    let cur = toMin(time)+30;
+    let cur = toMin(start)+30;
     while(cur <= 22*60){ opts.push(toTime(cur)); cur += 30; }
     return opts;
-  }, [time]);
+  }, [start]);
 
   const dateObj = new Date(selDate+'T00:00:00');
   const dateLabel = `${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 (${dow}) ${time}`;
@@ -2470,10 +2482,10 @@ function AdminCellModal({ cell, selDate, dow, onClose }){
               <option value="">학생 선택 ({filteredStudents.length}명)</option>
               {filteredStudents.map(s=><option key={s.id} value={s.id}>{s.name} ({s.type==='exam'?'입시':'취미'})</option>)}
             </select>
-            <div className="input-label">시간</div>
+            <div className="input-label">시간 (30분 단위로 선택 가능해요)</div>
             <div className="mini-add-row" style={{marginBottom:10}}>
               <select className="input" value={start} onChange={e=>setStart(e.target.value)}>
-                <option value={time}>{time}</option>
+                {startOptions.map(h=><option key={h} value={h}>{h}</option>)}
               </select>
               <select className="input" value={end} onChange={e=>setEnd(e.target.value)}>
                 {timeOptions.map(h=><option key={h} value={h}>{h}</option>)}
