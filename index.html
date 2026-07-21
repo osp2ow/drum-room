@@ -2668,40 +2668,9 @@ function AdminBlocksTab({ teacherId }){
   return (
     <div className="screen">
       <div className="eyebrow">ADMIN</div>
-      <h1 className="page-title">{isMainAdmin ? '공휴일 · 예약 차단 관리' : '예약 차단 관리'}</h1>
+      <h1 className="page-title">{isMainAdmin ? '예약 차단 · 공휴일 관리' : '예약 차단 관리'}</h1>
 
-      {isMainAdmin && (
-        <React.Fragment>
-          <div className="card-title" style={{margin:'4px 0 4px'}}>📅 공휴일 관리</div>
-          <p className="page-sub" style={{marginBottom:14}}>공휴일은 기본적으로 예약이 막혀요. 이 날은 정상 영업하려면 "영업으로 전환"을 눌러주세요.</p>
-          {upcomingHolidays.length===0 ? (
-            <div className="empty-state"><p>다가오는 공휴일이 없어요.</p></div>
-          ) : upcomingHolidays.map(h=>{
-            const opened = openedHolidays.has(h.date);
-            const d = new Date(h.date+'T00:00:00');
-            return (
-              <div className="list-item-row" key={h.date} style={{cursor:'default'}}>
-                <div>
-                  <div className="name">{h.name}</div>
-                  <div className="meta">{d.getMonth()+1}월 {d.getDate()}일 ({DOW[d.getDay()]})</div>
-                </div>
-                <div
-                  onClick={()=>toggleHoliday(h.date, opened)}
-                  style={{
-                    padding:'7px 14px', borderRadius:100, fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
-                    background: opened ? 'var(--brass-soft)' : 'var(--rec-soft)',
-                    color: opened ? 'var(--brass-bright)' : 'var(--rec)',
-                  }}
-                >
-                  {opened ? '✓ 영업으로 전환됨' : '휴무 (누르면 영업)'}
-                </div>
-              </div>
-            );
-          })}
-        </React.Fragment>
-      )}
-
-      <div className="card-title" style={{margin:'26px 0 4px'}}>🔒 예약 차단 관리</div>
+      <div className="card-title" style={{margin:'4px 0 4px'}}>🔒 예약 차단 관리</div>
       <p className="page-sub">매주 특정 요일·시간대에 특정 방을 예약할 수 없도록 지속적으로 막아둘 수 있어요. (예: 매주 금요일 1~3시, 5~7시에 2번방 차단)</p>
       <button className="btn" style={{marginBottom:18}} onClick={()=>setAdding(true)}>+ 새 차단 추가</button>
       {blocks.length===0 ? (
@@ -2715,6 +2684,39 @@ function AdminBlocksTab({ teacherId }){
           <span className="chev">›</span>
         </div>
       ))}
+
+      {isMainAdmin && (
+        <React.Fragment>
+          <div className="card-title" style={{margin:'28px 0 4px'}}>📅 공휴일 관리</div>
+          <p className="page-sub" style={{marginBottom:14}}>공휴일은 기본적으로 예약이 막혀요. 이 날 정상 영업하려면 눌러서 "영업"으로 바꿔주세요.</p>
+          {upcomingHolidays.length===0 ? (
+            <div className="empty-state"><p>다가오는 공휴일이 없어요.</p></div>
+          ) : (
+            <div style={{display:'flex', flexWrap:'wrap', gap:8}}>
+              {upcomingHolidays.map(h=>{
+                const opened = openedHolidays.has(h.date);
+                const d = new Date(h.date+'T00:00:00');
+                return (
+                  <div
+                    key={h.date}
+                    onClick={()=>toggleHoliday(h.date, opened)}
+                    style={{
+                      cursor:'pointer', borderRadius:12, padding:'8px 12px', flex:'0 0 auto',
+                      background: opened ? 'var(--brass-soft)' : 'var(--surface-2)',
+                      border: '1px solid ' + (opened ? 'var(--brass)' : 'var(--border)'),
+                    }}
+                  >
+                    <div style={{fontSize:12,fontWeight:700,color:'var(--text)',whiteSpace:'nowrap'}}>{h.name}</div>
+                    <div style={{fontSize:10.5,color:'var(--text-faint)',marginTop:2,whiteSpace:'nowrap'}}>{d.getMonth()+1}/{d.getDate()} ({DOW[d.getDay()]})</div>
+                    <div style={{fontSize:10.5,fontWeight:700,marginTop:3,color: opened?'var(--brass-bright)':'var(--rec)',whiteSpace:'nowrap'}}>{opened?'✓ 영업':'휴무'}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </React.Fragment>
+      )}
+
       {adding && <BlockAddModal onClose={()=>setAdding(false)} />}
       {editing && <BlockEditModal block={editing} onClose={()=>setEditing(null)} />}
     </div>
