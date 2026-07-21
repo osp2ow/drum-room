@@ -618,21 +618,52 @@ function fmtKDate(d){ return (d.getMonth()+1)+'월 '+d.getDate()+'일 ('+DOW[d.g
 
 // 2026년 대한민국 공휴일 (제헌절은 2026년부터 18년 만에 공휴일로 재지정됨)
 const KOREAN_HOLIDAYS_2026 = [
-  "2026-01-01", // 신정
-  "2026-02-16", "2026-02-17", "2026-02-18", // 설날 연휴
-  "2026-03-01", "2026-03-02", // 삼일절 (일) + 대체공휴일
-  "2026-05-01", // 노동절
-  "2026-05-05", // 어린이날
-  "2026-05-24", "2026-05-25", // 부처님오신날 (일) + 대체공휴일
-  "2026-06-06", // 현충일
-  "2026-07-17", // 제헌절
-  "2026-08-15", "2026-08-17", // 광복절 (토) + 대체공휴일
-  "2026-09-24", "2026-09-25", "2026-09-26", // 추석 연휴
-  "2026-10-03", "2026-10-05", // 개천절 (토) + 대체공휴일
-  "2026-10-09", // 한글날
-  "2026-12-25", // 크리스마스
+  { date:"2026-01-01", name:"신정" },
+  { date:"2026-02-16", name:"설날 연휴" }, { date:"2026-02-17", name:"설날" }, { date:"2026-02-18", name:"설날 연휴" },
+  { date:"2026-03-01", name:"삼일절" }, { date:"2026-03-02", name:"대체공휴일(삼일절)" },
+  { date:"2026-05-01", name:"노동절" },
+  { date:"2026-05-05", name:"어린이날" },
+  { date:"2026-05-24", name:"부처님오신날" }, { date:"2026-05-25", name:"대체공휴일(부처님오신날)" },
+  { date:"2026-06-06", name:"현충일" },
+  { date:"2026-07-17", name:"제헌절" },
+  { date:"2026-08-15", name:"광복절" }, { date:"2026-08-17", name:"대체공휴일(광복절)" },
+  { date:"2026-09-24", name:"추석 연휴" }, { date:"2026-09-25", name:"추석" }, { date:"2026-09-26", name:"추석 연휴" },
+  { date:"2026-10-03", name:"개천절" }, { date:"2026-10-05", name:"대체공휴일(개천절)" },
+  { date:"2026-10-09", name:"한글날" },
+  { date:"2026-12-25", name:"크리스마스" },
 ];
-function isHoliday(dateObj){ return KOREAN_HOLIDAYS_2026.includes(fmtDate(dateObj)); }
+// 2027년 대한민국 공휴일
+// ⚠️ 제헌절(7/17)은 2027년에 토요일이라, 대체공휴일 적용 여부가 아직 명확히 확인되지 않았어요.
+//    노동절(5/1)도 5인 미만 사업장은 유급휴일 의무가 없어요. 학원 운영 방침에 따라 필요하면 관리자 화면에서 개별 해제하세요.
+const KOREAN_HOLIDAYS_2027 = [
+  { date:"2027-01-01", name:"신정" },
+  { date:"2027-02-06", name:"설날 연휴" }, { date:"2027-02-07", name:"설날" }, { date:"2027-02-08", name:"설날 연휴" }, { date:"2027-02-09", name:"대체공휴일(설날)" },
+  { date:"2027-03-01", name:"삼일절" },
+  { date:"2027-05-01", name:"노동절" },
+  { date:"2027-05-05", name:"어린이날" },
+  { date:"2027-06-06", name:"현충일" },
+  { date:"2027-07-17", name:"제헌절" },
+  { date:"2027-08-15", name:"광복절" }, { date:"2027-08-16", name:"대체공휴일(광복절)" },
+  { date:"2027-09-14", name:"추석 연휴" }, { date:"2027-09-15", name:"추석" }, { date:"2027-09-16", name:"추석 연휴" },
+  { date:"2027-10-03", name:"개천절" }, { date:"2027-10-04", name:"대체공휴일(개천절)" },
+  { date:"2027-10-09", name:"한글날" }, { date:"2027-10-11", name:"대체공휴일(한글날)" },
+  { date:"2027-12-25", name:"크리스마스" }, { date:"2027-12-27", name:"대체공휴일(크리스마스)" },
+];
+const KOREAN_HOLIDAYS_LIST = [...KOREAN_HOLIDAYS_2026, ...KOREAN_HOLIDAYS_2027];
+const KOREAN_HOLIDAYS_MAP = {}; // { '2026-01-01': '신정', ... }
+KOREAN_HOLIDAYS_LIST.forEach(h=>{ KOREAN_HOLIDAYS_MAP[h.date] = h.name; });
+
+const COL_HOLIDAY_OVERRIDES = "juniper_holiday_overrides"; // 관리자가 '해제'해서 정상 영업하기로 한 공휴일 날짜들
+let openedHolidayDates = new Set(); // 최신 해제 목록 (전역 캐시, Firestore와 실시간 동기화)
+db.collection(COL_HOLIDAY_OVERRIDES).onSnapshot(snap=>{
+  openedHolidayDates = new Set(snap.docs.map(d=>d.id));
+}, err=>console.error(err));
+
+function isHoliday(dateObj){
+  const ds = fmtDate(dateObj);
+  if(openedHolidayDates.has(ds)) return false; // 관리자가 해제한 날짜는 정상 영업
+  return !!KOREAN_HOLIDAYS_MAP[ds];
+}
 
 function getOperatingHours(dateObj){
   const day = dateObj.getDay();
@@ -2604,6 +2635,7 @@ function AdminBlocksTab(){
   const [blocks, setBlocks] = useState([]);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null); // 기존 차단 1건 수정
+  const [openedHolidays, setOpenedHolidays] = useState(new Set());
 
   useEffect(()=>{
     const unsub = db.collection(COL_BLOCKS).onSnapshot(snap=>{
@@ -2612,10 +2644,59 @@ function AdminBlocksTab(){
     return ()=>unsub();
   }, []);
 
+  useEffect(()=>{
+    const unsub = db.collection(COL_HOLIDAY_OVERRIDES).onSnapshot(snap=>{
+      setOpenedHolidays(new Set(snap.docs.map(d=>d.id)));
+    });
+    return ()=>unsub();
+  }, []);
+
+  async function toggleHoliday(date, currentlyOpened){
+    try{
+      if(currentlyOpened){
+        await db.collection(COL_HOLIDAY_OVERRIDES).doc(date).delete();
+      } else {
+        await db.collection(COL_HOLIDAY_OVERRIDES).doc(date).set({ openedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      }
+    }catch(e){ alert('처리 중 오류가 발생했어요. 다시 시도해주세요.'); }
+  }
+
+  const todayStr = fmtDate(new Date());
+  const upcomingHolidays = KOREAN_HOLIDAYS_LIST.filter(h=>h.date>=todayStr);
+
   return (
     <div className="screen">
       <div className="eyebrow">ADMIN</div>
-      <h1 className="page-title">예약 차단 관리</h1>
+      <h1 className="page-title">공휴일 · 예약 차단 관리</h1>
+
+      <div className="card-title" style={{margin:'4px 0 4px'}}>📅 공휴일 관리</div>
+      <p className="page-sub" style={{marginBottom:14}}>공휴일은 기본적으로 예약이 막혀요. 이 날은 정상 영업하려면 "영업으로 전환"을 눌러주세요.</p>
+      {upcomingHolidays.length===0 ? (
+        <div className="empty-state"><p>다가오는 공휴일이 없어요.</p></div>
+      ) : upcomingHolidays.map(h=>{
+        const opened = openedHolidays.has(h.date);
+        const d = new Date(h.date+'T00:00:00');
+        return (
+          <div className="list-item-row" key={h.date} style={{cursor:'default'}}>
+            <div>
+              <div className="name">{h.name}</div>
+              <div className="meta">{d.getMonth()+1}월 {d.getDate()}일 ({DOW[d.getDay()]})</div>
+            </div>
+            <div
+              onClick={()=>toggleHoliday(h.date, opened)}
+              style={{
+                padding:'7px 14px', borderRadius:100, fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
+                background: opened ? 'var(--brass-soft)' : 'var(--rec-soft)',
+                color: opened ? 'var(--brass-bright)' : 'var(--rec)',
+              }}
+            >
+              {opened ? '✓ 영업으로 전환됨' : '휴무 (누르면 영업)'}
+            </div>
+          </div>
+        );
+      })}
+
+      <div className="card-title" style={{margin:'26px 0 4px'}}>🔒 예약 차단 관리</div>
       <p className="page-sub">매주 특정 요일·시간대에 특정 방을 예약할 수 없도록 지속적으로 막아둘 수 있어요. (예: 매주 금요일 1~3시, 5~7시에 2번방 차단)</p>
       <button className="btn" style={{marginBottom:18}} onClick={()=>setAdding(true)}>+ 새 차단 추가</button>
       {blocks.length===0 ? (
