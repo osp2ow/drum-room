@@ -2631,7 +2631,8 @@ function hourLabel12(hhmm){
   return h12 + '시';
 }
 
-function AdminBlocksTab(){
+function AdminBlocksTab({ teacherId }){
+  const isMainAdmin = (teacherId || MAIN_TEACHER_ID) === MAIN_TEACHER_ID;
   const [blocks, setBlocks] = useState([]);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null); // 기존 차단 1건 수정
@@ -2667,34 +2668,38 @@ function AdminBlocksTab(){
   return (
     <div className="screen">
       <div className="eyebrow">ADMIN</div>
-      <h1 className="page-title">공휴일 · 예약 차단 관리</h1>
+      <h1 className="page-title">{isMainAdmin ? '공휴일 · 예약 차단 관리' : '예약 차단 관리'}</h1>
 
-      <div className="card-title" style={{margin:'4px 0 4px'}}>📅 공휴일 관리</div>
-      <p className="page-sub" style={{marginBottom:14}}>공휴일은 기본적으로 예약이 막혀요. 이 날은 정상 영업하려면 "영업으로 전환"을 눌러주세요.</p>
-      {upcomingHolidays.length===0 ? (
-        <div className="empty-state"><p>다가오는 공휴일이 없어요.</p></div>
-      ) : upcomingHolidays.map(h=>{
-        const opened = openedHolidays.has(h.date);
-        const d = new Date(h.date+'T00:00:00');
-        return (
-          <div className="list-item-row" key={h.date} style={{cursor:'default'}}>
-            <div>
-              <div className="name">{h.name}</div>
-              <div className="meta">{d.getMonth()+1}월 {d.getDate()}일 ({DOW[d.getDay()]})</div>
-            </div>
-            <div
-              onClick={()=>toggleHoliday(h.date, opened)}
-              style={{
-                padding:'7px 14px', borderRadius:100, fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
-                background: opened ? 'var(--brass-soft)' : 'var(--rec-soft)',
-                color: opened ? 'var(--brass-bright)' : 'var(--rec)',
-              }}
-            >
-              {opened ? '✓ 영업으로 전환됨' : '휴무 (누르면 영업)'}
-            </div>
-          </div>
-        );
-      })}
+      {isMainAdmin && (
+        <React.Fragment>
+          <div className="card-title" style={{margin:'4px 0 4px'}}>📅 공휴일 관리</div>
+          <p className="page-sub" style={{marginBottom:14}}>공휴일은 기본적으로 예약이 막혀요. 이 날은 정상 영업하려면 "영업으로 전환"을 눌러주세요.</p>
+          {upcomingHolidays.length===0 ? (
+            <div className="empty-state"><p>다가오는 공휴일이 없어요.</p></div>
+          ) : upcomingHolidays.map(h=>{
+            const opened = openedHolidays.has(h.date);
+            const d = new Date(h.date+'T00:00:00');
+            return (
+              <div className="list-item-row" key={h.date} style={{cursor:'default'}}>
+                <div>
+                  <div className="name">{h.name}</div>
+                  <div className="meta">{d.getMonth()+1}월 {d.getDate()}일 ({DOW[d.getDay()]})</div>
+                </div>
+                <div
+                  onClick={()=>toggleHoliday(h.date, opened)}
+                  style={{
+                    padding:'7px 14px', borderRadius:100, fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
+                    background: opened ? 'var(--brass-soft)' : 'var(--rec-soft)',
+                    color: opened ? 'var(--brass-bright)' : 'var(--rec)',
+                  }}
+                >
+                  {opened ? '✓ 영업으로 전환됨' : '휴무 (누르면 영업)'}
+                </div>
+              </div>
+            );
+          })}
+        </React.Fragment>
+      )}
 
       <div className="card-title" style={{margin:'26px 0 4px'}}>🔒 예약 차단 관리</div>
       <p className="page-sub">매주 특정 요일·시간대에 특정 방을 예약할 수 없도록 지속적으로 막아둘 수 있어요. (예: 매주 금요일 1~3시, 5~7시에 2번방 차단)</p>
@@ -3336,7 +3341,7 @@ function AdminShell({ onLogout, allowedTabs, teacherId }){
       {tabs.some(t=>t.key==='students') && <div style={{display: tab==='students' ? 'block' : 'none'}}><AdminStudentsTab teacherId={teacherId}/></div>}
       {tabs.some(t=>t.key==='timetable') && <div style={{display: tab==='timetable' ? 'block' : 'none'}}><AdminTimetableTab teacherId={teacherId}/></div>}
       {tabs.some(t=>t.key==='reservations') && <div style={{display: tab==='reservations' ? 'block' : 'none'}}><AdminReservationsTab/></div>}
-      {tabs.some(t=>t.key==='blocks') && <div style={{display: tab==='blocks' ? 'block' : 'none'}}><AdminBlocksTab/></div>}
+      {tabs.some(t=>t.key==='blocks') && <div style={{display: tab==='blocks' ? 'block' : 'none'}}><AdminBlocksTab teacherId={teacherId}/></div>}
       {tabs.some(t=>t.key==='notices') && <div style={{display: tab==='notices' ? 'block' : 'none'}}><AdminNoticesTab/></div>}
       <TabBar tabs={tabs} active={tab} onChange={setTab} />
     </React.Fragment>
