@@ -338,6 +338,7 @@
     font-family:var(--font-display);font-size:12.5px;font-weight:700;color:var(--text);
     padding:10px 4px;text-align:center;background:var(--surface-2);border-bottom:1px solid var(--border);position:sticky;top:0;
   }
+  .tt-today-dot{width:5px;height:5px;border-radius:50%;background:var(--rec);margin:4px auto 0;}
   .tt-time-h{width:54px;}
   .tt-time{
     font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);
@@ -3012,7 +3013,7 @@ function AdminTimetableTab({ teacherId }){
   const students = useMemo(()=> allStudents.filter(s=> (s.teacherId || MAIN_TEACHER_ID) === myTeacherId), [allStudents, myTeacherId]);
   const myStudentIds = useMemo(()=> new Set(students.map(s=>s.id)), [students]);
 
-  const DAYS = ['월','화','수','목','금'];
+  const DAYS = myTeacherId !== MAIN_TEACHER_ID ? ['월','화','수','목','금','토'] : ['월','화','수','목','금'];
   const HOURS = CLASS_HOURS; // 12:00 ~ 21:00 (시작 시간 기준)
 
   const weekDates = useMemo(()=>{
@@ -3088,7 +3089,7 @@ function AdminTimetableTab({ teacherId }){
           <thead>
             <tr>
               <th className="tt-time-h"></th>
-              {DAYS.map(d=><th key={d}>{d}</th>)}
+              {DAYS.map(d=><th key={d}>{d}{isThisWeek && d===DOW[new Date().getDay()] && <div className="tt-today-dot"/>}</th>)}
             </tr>
           </thead>
           <tbody ref={tbodyRef}>
