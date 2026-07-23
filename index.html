@@ -3109,7 +3109,7 @@ function AdminTimetableTab({ teacherId }){
                         const dateLabels = absenceEntries.map(a=>{ const d = new Date(a.date+'T00:00:00'); return `${d.getMonth()+1}월${d.getDate()}일 결석`; });
                         return (
                           <div key={en.id} style={{marginBottom:2}}>
-                            <div className="tt-name" style={{color:col, textDecoration: absent?'line-through':'none'}}>{en.name}</div>
+                            <div className="tt-name" style={{color:col}}>{en.name}</div>
                             {absent ? dateLabels.map((lbl,li)=>(
                               <div key={li} className="tt-type" style={{color:col}}>{lbl}</div>
                             )) : (
