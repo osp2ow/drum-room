@@ -2346,7 +2346,7 @@ function AdminReservationsTab(){
 
   const dates = useMemo(()=>{
     const arr = []; let d = new Date(); d.setHours(0,0,0,0);
-    for(let i=0;i<14;i++){ const cand = addDays(d,i); if(cand.getDay()!==0 && !isHoliday(cand)) arr.push(cand); }
+    for(let i=0;i<=7;i++){ const cand = addDays(d,i); if(cand.getDay()!==0 && !isHoliday(cand)) arr.push(cand); }
     return arr;
   }, []);
   const minDate = fmtDate(dates[0]);
