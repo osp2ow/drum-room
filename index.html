@@ -597,6 +597,7 @@ const COL_STUDENTS = "juniper_students";
 const COL_RESERVATIONS = "juniper_reservations";
 const COL_NOTICES = "juniper_notices";
 const COL_BLOCKS = "juniper_blocks";
+const COL_BLOCK_EXCEPTIONS = "juniper_block_exceptions"; // 특정 날짜 하루만 차단을 해제한 기록
 const COL_OVERRIDES = "juniper_schedule_overrides";
 
 /* ============================================================
@@ -1234,7 +1235,7 @@ function ManageReservationsModal({ student, onClose, onGoReserve }){
 /* ============================================================
    STUDENT: RESERVE TAB
    ============================================================ */
-function ReserveTab({ student, blocks }){
+function ReserveTab({ student, blocks, exceptions }){
   const dateScrollRef = useHScroll();
   const availableRooms = useMemo(()=> getAvailableRooms(student.type), [student.type]);
   const [selDate, setSelDate] = useState(fmtDate(new Date()));
@@ -1311,7 +1312,8 @@ function ReserveTab({ student, blocks }){
     if(room === 5){
       return isEnsembleFree(selDate, time) ? 'free' : 'blocked';
     }
-    const isClosed = blocks.some(b => Number(b.room)===room && b.day===dow && toMin(b.start)<e && s<toMin(b.end));
+    const isExcepted = exceptions.some(x => Number(x.room)===room && x.date===selDate && toMin(x.start)<e && s<toMin(x.end));
+    const isClosed = !isExcepted && blocks.some(b => Number(b.room)===room && b.day===dow && toMin(b.start)<e && s<toMin(b.end));
     if(isClosed) return 'closed';
     const ok = canAddSlotDisplay(student.type, budgetExistingSlots, budgetDraftSlots, room, time);
     return ok ? 'free' : 'blocked';
@@ -1911,7 +1913,7 @@ function MyTab({ student, notices, onLogout }){
 /* ============================================================
    STUDENT: TIMETABLE TAB (입시생 전용 - 전체 방 예약 일정표, 읽기 전용)
    ============================================================ */
-function StudentTimetableTab({ student, blocks }){
+function StudentTimetableTab({ student, blocks, exceptions }){
   const dateScrollRef = useHScroll();
   const wrapRef = React.useRef(null);
   const tbodyRef = React.useRef(null);
@@ -1958,6 +1960,8 @@ function StudentTimetableTab({ student, blocks }){
   }
   function isClosed(room, time){
     const s = toMin(time), e = s+30;
+    const isExcepted = exceptions.some(x=> Number(x.room)===room && x.date===selDate && toMin(x.start)<e && s<toMin(x.end));
+    if(isExcepted) return false;
     return blocks.some(b=> Number(b.room)===room && b.day===dow && toMin(b.start)<e && s<toMin(b.end));
   }
   function ensembleState(time){
@@ -2069,6 +2073,7 @@ function StudentShell({ student, onLogout }){
   useEffect(()=>{ localStorage.setItem('juniper_student_tab', tab); }, [tab]);
   const [notices, setNotices] = useState([]);
   const [blocks, setBlocks] = useState([]);
+  const [exceptions, setExceptions] = useState([]);
   const [liveStudent, setLiveStudent] = useState(student);
   useEffect(()=>{ if(tab==='status') setTab('home'); }, []);
 
@@ -2083,6 +2088,15 @@ function StudentShell({ student, onLogout }){
     const unsub = db.collection(COL_BLOCKS).onSnapshot(snap=>{
       setBlocks(snap.docs.map(d=>({id:d.id,...d.data()})));
     });
+    return ()=>unsub();
+  }, []);
+
+  useEffect(()=>{
+    const todayStr = fmtDate(new Date());
+    const maxStr = fmtDate(addDays(new Date(), 14));
+    const unsub = db.collection(COL_BLOCK_EXCEPTIONS)
+      .where('date','>=',todayStr).where('date','<=',maxStr)
+      .onSnapshot(snap=>{ setExceptions(snap.docs.map(d=>({id:d.id,...d.data()}))); }, err=>console.error(err));
     return ()=>unsub();
   }, []);
 
@@ -2106,8 +2120,8 @@ function StudentShell({ student, onLogout }){
     <React.Fragment>
       <AppHeader right={<span>{liveStudent.type==='exam'?'입시생':'취미생'}</span>} />
       <div style={{display: tab==='home' ? 'block' : 'none'}}><HomeTab student={liveStudent} notices={visibleNotices} onGoReserve={()=>setTab('reserve')} /></div>
-      <div style={{display: tab==='reserve' ? 'block' : 'none'}}><ReserveTab student={liveStudent} blocks={blocks} /></div>
-      <div style={{display: tab==='timetable' ? 'block' : 'none'}}><StudentTimetableTab student={liveStudent} blocks={blocks} /></div>
+      <div style={{display: tab==='reserve' ? 'block' : 'none'}}><ReserveTab student={liveStudent} blocks={blocks} exceptions={exceptions} /></div>
+      <div style={{display: tab==='timetable' ? 'block' : 'none'}}><StudentTimetableTab student={liveStudent} blocks={blocks} exceptions={exceptions} /></div>
       <div style={{display: tab==='my' ? 'block' : 'none'}}><MyTab student={liveStudent} notices={visibleNotices} onLogout={onLogout} /></div>
       <TabBar tabs={tabs} active={tab} onChange={setTab} />
     </React.Fragment>
@@ -2316,6 +2330,14 @@ function AdminReservationsTab(){
     return ()=>unsub();
   }, []);
 
+  const [exceptions, setExceptions] = useState([]);
+  useEffect(()=>{
+    const unsub = db.collection(COL_BLOCK_EXCEPTIONS).where('date','==',selDate).onSnapshot(snap=>{
+      setExceptions(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+    return ()=>unsub();
+  }, [selDate]);
+
   const dates = useMemo(()=>{
     const arr = []; let d = new Date(); d.setHours(0,0,0,0);
     for(let i=0;i<14;i++){ const cand = addDays(d,i); if(cand.getDay()!==0 && !isHoliday(cand)) arr.push(cand); }
@@ -2337,9 +2359,15 @@ function AdminReservationsTab(){
     const s = toMin(time), e = s+30;
     return reservations.find(r=> Number(r.room)===room && toMin(r.start)<=s && e<=toMin(r.end)) || null;
   }
+  function hasException(room, time){
+    const s = toMin(time), e = s+30;
+    return exceptions.some(x=> Number(x.room)===room && toMin(x.start)<=s && e<=toMin(x.end));
+  }
   function findBlock(room, time){
     const s = toMin(time), e = s+30;
-    return blocks.find(b=> Number(b.room)===room && b.day===dow && toMin(b.start)<=s && e<=toMin(b.end)) || null;
+    const blk = blocks.find(b=> Number(b.room)===room && b.day===dow && toMin(b.start)<=s && e<=toMin(b.end)) || null;
+    if(blk && hasException(room, time)) return null; // 이 날짜만 예외로 해제됨
+    return blk;
   }
   function ensembleState(time){
     if(!ensembleHoursToday) return 'unavailable';
@@ -2470,11 +2498,15 @@ function AdminCellModal({ cell, selDate, dow, onClose }){
   const dateObj = new Date(selDate+'T00:00:00');
   const dateLabel = `${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 (${dow}) ${time}`;
 
-  async function unblock(){
-    if(!window.confirm('이 차단을 해제할까요?')) return;
+  async function unblockOnce(){
     setSaving(true);
-    try{ await db.collection(COL_BLOCKS).doc(block.id).delete(); onClose(); }
-    catch(e){ alert('차단 해제 중 오류가 발생했어요.'); setSaving(false); }
+    try{
+      await db.collection(COL_BLOCK_EXCEPTIONS).add({
+        date: selDate, room: Number(room), start: time, end: toTime(toMin(time)+30),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      onClose();
+    }catch(e){ alert('처리 중 오류가 발생했어요. 다시 시도해주세요.'); setSaving(false); }
   }
 
   async function addReservation(){
@@ -2518,7 +2550,11 @@ function AdminCellModal({ cell, selDate, dow, onClose }){
             <p style={{fontSize:12.5,color:'var(--text-muted)',marginTop:0,marginBottom:16,lineHeight:1.6}}>
               매주 {block.day}요일 {block.start}~{block.end} 차단되어 있어요.{block.note ? ` (${block.note})` : ''}
             </p>
-            <button className="btn btn-danger" disabled={saving} onClick={unblock}>{saving?'처리 중...':'차단 해제'}</button>
+            <p style={{fontSize:14,fontWeight:700,color:'var(--text)',marginBottom:16,lineHeight:1.6}}>
+              {dateObj.getMonth()+1}월 {dateObj.getDate()}일 {dow}요일 {hourLabel12(time)} {roomLabel(room)} 연습실 제한을 해제하겠습니까?
+            </p>
+            <p style={{fontSize:11.5,color:'var(--text-faint)',marginBottom:16,lineHeight:1.5}}>이번 주만 해제돼요. 다음 주부터는 다시 원래대로 차단돼요.</p>
+            <button className="btn btn-danger" disabled={saving} onClick={unblockOnce}>{saving?'처리 중...':'이번 주만 해제하기'}</button>
           </React.Fragment>
         ) : mode===null ? (
           <div className="toggle-row" style={{marginBottom:4}}>
@@ -2610,8 +2646,16 @@ function ReservationEditModal({ reservation, onClose }){
           <input className="input" type="date" value={date} onChange={e=>setDate(e.target.value)} />
         </div>
         <div className="mini-add-row">
-          <input className="input" type="time" value={start} onChange={e=>setStart(e.target.value)} />
-          <input className="input" type="time" value={end} onChange={e=>setEnd(e.target.value)} />
+          <select className="input" value={start} onChange={e=>{
+            const v = e.target.value;
+            setStart(v);
+            if(toMin(end) <= toMin(v)) setEnd(toTime(Math.min(toMin(v)+30, 22*60)));
+          }}>
+            {HALF_HOUR_OPTIONS.map(h=><option key={h} value={h}>{h}</option>)}
+          </select>
+          <select className="input" value={end} onChange={e=>setEnd(e.target.value)}>
+            {HALF_HOUR_OPTIONS.filter(h=>toMin(h)>toMin(start)).map(h=><option key={h} value={h}>{h}</option>)}
+          </select>
         </div>
 
         <button className="btn" disabled={saving} onClick={save} style={{marginTop:18,marginBottom:10}}>{saving?'저장 중...':'저장하기'}</button>
@@ -2625,6 +2669,7 @@ function ReservationEditModal({ reservation, onClose }){
    ADMIN: BLOCKS TAB (특정 방·시간 지속 차단)
    ============================================================ */
 const BLOCK_HOURS = (()=>{ const arr=[]; for(let h=13; h<=22; h++) arr.push(pad(h)+':00'); return arr; })();
+const HALF_HOUR_OPTIONS = (()=>{ const arr=[]; for(let m=13*60; m<=22*60; m+=30) arr.push(toTime(m)); return arr; })();
 const CLASS_HOURS = (()=>{ const arr=[]; for(let h=12; h<=21; h++) arr.push(pad(h)+':00'); return arr; })(); // 수업 시간표: 12:00 ~ 22:00 (시작 시간 기준)
 function hourLabel12(hhmm){
   const h = parseInt(hhmm.split(':')[0], 10);
@@ -3001,7 +3046,10 @@ function AdminTimetableTab({ teacherId }){
   const [allStudents, setAllStudents] = useState([]);
   const [overrides, setOverrides] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
-  const myTeacherId = teacherId || MAIN_TEACHER_ID;
+  const loginTeacherId = teacherId || MAIN_TEACHER_ID;
+  const isMainAdmin = loginTeacherId === MAIN_TEACHER_ID;
+  const [viewTeacherId, setViewTeacherId] = useState(loginTeacherId);
+  const myTeacherId = isMainAdmin ? viewTeacherId : loginTeacherId;
 
   useEffect(()=>{
     const unsub = db.collection(COL_STUDENTS).orderBy('name').onSnapshot(snap=>{
@@ -3073,6 +3121,15 @@ function AdminTimetableTab({ teacherId }){
     <div className="screen" style={{maxWidth:480, margin:'0 auto'}}>
       <div className="eyebrow">ADMIN</div>
       <h1 className="page-title">{teacherLabel(myTeacherId)} 시간표</h1>
+
+      {isMainAdmin && (
+        <div className="toggle-row" style={{marginBottom:16}}>
+          <div className={"toggle-opt"+(viewTeacherId===MAIN_TEACHER_ID?' active':'')} onClick={()=>setViewTeacherId(MAIN_TEACHER_ID)}>원장님</div>
+          {TEACHER_ACCOUNTS.map(t=>(
+            <div key={t.teacherId} className={"toggle-opt"+(viewTeacherId===t.teacherId?' active':'')} onClick={()=>setViewTeacherId(t.teacherId)}>{t.id}</div>
+          ))}
+        </div>
+      )}
 
       <div className="legend" style={{marginBottom:14}}>
         <div className="legend-item"><div className="legend-dot" style={{background:'var(--brass-soft)',border:'1px solid var(--brass)'}}/>정규 수업</div>
