@@ -545,16 +545,21 @@ function useNowLineTop(wrapRef, tbodyRef, hours, isToday, slotMinutes){
       const nowMin = now.getHours()*60 + now.getMinutes();
       const startMin = toMin(hours.start), endMin = toMin(hours.end);
       if(nowMin < startMin || nowMin > endMin){ setTop(null); return; }
-      const totalSlots = (endMin - startMin) / stepMin;
-      const rowIndex = (nowMin - startMin) / stepMin;
+      const rows = tbodyRef.current.rows;
+      if(!rows || rows.length===0){ setTop(null); return; }
+      const exactIndex = (nowMin - startMin) / stepMin; // 소수점 포함 (예: 3.4번째 줄)
+      const rowIndex = Math.min(Math.floor(exactIndex), rows.length-1);
+      const fraction = exactIndex - rowIndex;
       const wrapRect = wrapRef.current.getBoundingClientRect();
       const tbodyRect = tbodyRef.current.getBoundingClientRect();
-      if(tbodyRect.height <= 0){ setTop(null); return; }
-      const avgRowH = tbodyRect.height / totalSlots;
-      setTop((tbodyRect.top - wrapRect.top) + rowIndex * avgRowH);
+      // 실제 각 줄의 높이를 하나씩 더해서 정확한 위치를 구해요 (줄마다 높이가 달라도 정확함)
+      let cum = 0;
+      for(let i=0; i<rowIndex; i++){ cum += rows[i].getBoundingClientRect().height; }
+      cum += rows[rowIndex].getBoundingClientRect().height * fraction;
+      setTop((tbodyRect.top - wrapRect.top) + cum);
     }
     update();
-    const id = setInterval(update, 60000);
+    const id = setInterval(update, 30000);
     window.addEventListener('resize', update);
     return ()=>{ clearInterval(id); window.removeEventListener('resize', update); };
   }, [hours, isToday, stepMin]);
