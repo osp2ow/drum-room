@@ -548,11 +548,12 @@ function useNowLineTop(wrapRef, tbodyRef, hours, isToday, slotMinutes){
       if(nowMin < startMin || nowMin > endMin){ setTop(null); return; }
       const rows = tbodyRef.current.rows;
       if(!rows || rows.length===0){ setTop(null); return; }
+      const tbodyRect = tbodyRef.current.getBoundingClientRect();
+      if(tbodyRect.height === 0){ return; } // 탭이 화면에 안 보이는 상태(display:none)에서 잰 값은 무시 - 이전 값 유지, IntersectionObserver가 보이는 순간 다시 재요청함
       const exactIndex = (nowMin - startMin) / stepMin; // 소수점 포함 (예: 3.4번째 줄)
       const rowIndex = Math.min(Math.floor(exactIndex), rows.length-1);
       const fraction = exactIndex - rowIndex;
       const wrapRect = wrapRef.current.getBoundingClientRect();
-      const tbodyRect = tbodyRef.current.getBoundingClientRect();
       // 실제 각 줄의 높이를 하나씩 더해서 정확한 위치를 구해요 (줄마다 높이가 달라도 정확함)
       let cum = 0;
       for(let i=0; i<rowIndex; i++){ cum += rows[i].getBoundingClientRect().height; }
@@ -560,9 +561,22 @@ function useNowLineTop(wrapRef, tbodyRef, hours, isToday, slotMinutes){
       setTop((tbodyRect.top - wrapRect.top) + cum);
     }
     update();
-    const id = setInterval(update, 30000);
+    const id = setInterval(update, 15000);
     window.addEventListener('resize', update);
-    return ()=>{ clearInterval(id); window.removeEventListener('resize', update); };
+
+    let observer;
+    if(wrapRef.current && 'IntersectionObserver' in window){
+      observer = new IntersectionObserver((entries)=>{
+        entries.forEach(entry=>{ if(entry.isIntersecting) update(); });
+      });
+      observer.observe(wrapRef.current);
+    }
+
+    return ()=>{
+      clearInterval(id);
+      window.removeEventListener('resize', update);
+      if(observer) observer.disconnect();
+    };
   }, [hours, isToday, stepMin]);
   return top;
 }
@@ -683,7 +697,8 @@ function getOperatingHours(dateObj){
 // 합주실: 평일만, 1시~9시(13:00~21:00). 수업 시간표와 자동 연동돼요.
 function getEnsembleHours(dateObj){
   const day = dateObj.getDay();
-  if(day === 0 || day === 6 || isHoliday(dateObj)) return null;
+  if(day === 0 || isHoliday(dateObj)) return null; // 일요일·공휴일 휴무
+  if(day === 6) return { start:'13:00', end:'19:00' }; // 토요일 (김믿음 선생님 시간표와 연동)
   return { start:'13:00', end:'21:00' };
 }
 
@@ -707,14 +722,29 @@ function useEnsembleFree(minDate, maxDate){
     return ()=>unsub();
   }, [minDate, maxDate]);
 
+  // 합주실은 요일에 따라 기준이 되는 선생님이 달라요: 월~금은 원장님, 토요일은 김믿음 선생님 학생 시간표 기준.
+  const saturdayTeacherId = TEACHER_ACCOUNTS[0] ? TEACHER_ACCOUNTS[0].teacherId : MAIN_TEACHER_ID;
+  const byTeacher = useMemo(()=>{
+    const map = {};
+    allStudents.forEach(s=>{
+      const tid = s.teacherId || MAIN_TEACHER_ID;
+      if(!map[tid]) map[tid] = [];
+      map[tid].push(s);
+    });
+    return map;
+  }, [allStudents]);
+
   return function isEnsembleFree(date, time){
     const blockHour = toTime(Math.floor(toMin(time)/60)*60); // 30분 슬롯이 속한 1시간 수업 블록
     const dow = DOW[new Date(date+'T00:00:00').getDay()];
+    const relevantTeacherId = dow === '토' ? saturdayTeacherId : MAIN_TEACHER_ID;
+    const relevantStudents = byTeacher[relevantTeacherId] || [];
+    const relevantIds = new Set(relevantStudents.map(s=>s.id));
     const regularStudentIds = [];
-    allStudents.forEach(s=>{
+    relevantStudents.forEach(s=>{
       (s.schedule||[]).forEach(sch=>{ if(sch.day===dow && sch.start===blockHour) regularStudentIds.push(s.id); });
     });
-    const hasMakeup = overrides.some(o=>o.kind==='makeup' && o.date===date && o.start===blockHour);
+    const hasMakeup = overrides.some(o=>o.kind==='makeup' && o.date===date && o.start===blockHour && o.studentId && relevantIds.has(o.studentId));
     if(hasMakeup) return false; // 보강 있으면 사용 불가
     if(regularStudentIds.length===0) return true; // 수업 없음 -> 사용 가능
     // 그 시간에 수업 있는 학생들이 전부 결석 처리되어 있어야 사용 가능
