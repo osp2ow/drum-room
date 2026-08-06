@@ -230,9 +230,9 @@
     box-shadow:0 6px 14px rgba(47,191,175,0.25);
   }
   .hero-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
-  .hero-name{font-family:var(--font-display);font-size:18.5px;font-weight:800;letter-spacing:-0.01em;}
+  .hero-name{font-family:var(--font-display);font-size:16.5px;font-weight:600;letter-spacing:-0.01em;}
   .hero-sub{font-size:11.5px;color:rgba(255,255,255,0.9);font-weight:700;flex-shrink:0;}
-  .hero-schedule-line{font-family:var(--font-display);font-size:15.5px;font-weight:500;letter-spacing:-0.01em;color:#FFFFFF;margin-top:9px;line-height:1.4;}
+  .hero-schedule-line{font-family:var(--font-display);font-size:14px;font-weight:500;letter-spacing:-0.01em;color:#FFFFFF;margin-top:9px;line-height:1.4;}
   .hero-makeup-line{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
   .hero-makeup-badge{background:rgba(255,255,255,0.92);color:#2E6FE8;font-size:11.5px;font-weight:800;padding:5px 11px;border-radius:100px;white-space:nowrap;}
   .hero-absence-badge{background:rgba(255,255,255,0.92);color:#E0393E;font-size:11.5px;font-weight:800;padding:5px 11px;border-radius:100px;white-space:nowrap;}
@@ -619,6 +619,48 @@ const COL_NOTICES = "juniper_notices";
 const COL_BLOCKS = "juniper_blocks";
 const COL_BLOCK_EXCEPTIONS = "juniper_block_exceptions"; // 특정 날짜 하루만 차단을 해제한 기록
 const COL_OVERRIDES = "juniper_schedule_overrides";
+const COL_PUSH_SUBS = "juniper_push_subscriptions";
+// 웹 푸시 알림용 VAPID 공개키 (Cloud Functions 배포 시 사용한 키와 반드시 같아야 해요)
+const VAPID_PUBLIC_KEY = "BN8yN09ZKsZEVVJe1sby_dXHI1C5Q6si7xCeZh-9yPh_-vSpOwztEGvE2tD1inYhQcb8am-CC40YTZ03RovO1Sc";
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i=0; i<rawData.length; i++){ outputArray[i] = rawData.charCodeAt(i); }
+  return outputArray;
+}
+
+async function enablePushNotifications(student){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    alert('이 브라우저/기기에서는 알림 기능을 지원하지 않아요. (iOS는 홈 화면에 추가한 뒤, iOS 16.4 이상에서만 가능해요)');
+    return false;
+  }
+  try{
+    const reg = await navigator.serviceWorker.register('./sw.js');
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){
+      alert('알림을 허용해주셔야 예약 알림을 받을 수 있어요.');
+      return false;
+    }
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+    await db.collection(COL_PUSH_SUBS).doc(sub.endpoint.slice(-40)).set({
+      studentId: student.id,
+      studentName: student.name,
+      subscription: sub.toJSON(),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  }catch(e){
+    console.error(e);
+    alert('알림 설정 중 문제가 발생했어요. iOS는 반드시 홈 화면에 추가한 앱에서만 알림을 켤 수 있어요.');
+    return false;
+  }
+}
 
 /* ============================================================
    HELPERS
@@ -1892,6 +1934,22 @@ function MyTab({ student, notices, onLogout }){
   const [selectedNotice, setSelectedNotice] = useState(null);
   const [examReservations, setExamReservations] = useState([]);
   const [showStats, setShowStats] = useState(false);
+  const [pushStatus, setPushStatus] = useState('idle'); // idle | loading | on | unsupported
+
+  useEffect(()=>{
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)){ setPushStatus('unsupported'); return; }
+    navigator.serviceWorker.getRegistration().then(reg=>{
+      if(reg){
+        reg.pushManager.getSubscription().then(sub=>{ if(sub) setPushStatus('on'); });
+      }
+    });
+  }, []);
+
+  async function handleEnablePush(){
+    setPushStatus('loading');
+    const ok = await enablePushNotifications(student);
+    setPushStatus(ok ? 'on' : 'idle');
+  }
 
   useEffect(()=>{
     const unsub = db.collection(COL_RESERVATIONS).where('studentId','==',student.id).onSnapshot(snap=>{
@@ -1921,6 +1979,20 @@ function MyTab({ student, notices, onLogout }){
           </div>
           <span className={"tag "+(student.type==='exam'?'tag-exam':'tag-hobby')}>{student.type==='exam'?'입시생':'취미생'}</span>
         </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title">🔔 예약 알림</div>
+        {pushStatus==='unsupported' ? (
+          <p style={{fontSize:12.5,color:'var(--text-faint)',margin:0,lineHeight:1.6}}>이 기기/브라우저에서는 알림을 지원하지 않아요. (iOS는 홈 화면에 추가한 뒤 iOS 16.4 이상에서만 가능해요)</p>
+        ) : pushStatus==='on' ? (
+          <p style={{fontSize:12.5,color:'var(--brass-bright)',margin:0,fontWeight:700}}>✓ 알림이 켜져 있어요. 예약 당일 오전 10시에 알림을 보내드려요.</p>
+        ) : (
+          <React.Fragment>
+            <p style={{fontSize:12.5,color:'var(--text-muted)',margin:'0 0 12px',lineHeight:1.6}}>예약 당일 오전 10시에 그날 예약 안내를 받아보세요.</p>
+            <button className="btn" disabled={pushStatus==='loading'} onClick={handleEnablePush}>{pushStatus==='loading'?'설정 중...':'알림 받기'}</button>
+          </React.Fragment>
+        )}
       </div>
 
       {(
