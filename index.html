@@ -1581,7 +1581,7 @@ function ReserveTab({ student, blocks, exceptions }){
       {selDate < RESERVATION_START_DATE ? (
         <div className="info-box">연습실 예약은 8월 1일부터 열려요. 8월 1일 이후 날짜를 선택해주세요.</div>
       ) : !hours ? (
-        <div className="info-box">일요일 또는 공휴일은 학원 휴무일이에요. 다른 날짜를 선택해주세요.</div>
+        <div className="info-box">공휴일은 학원 휴무일이에요. 다른 날짜를 선택해주세요.</div>
       ) : (
         <React.Fragment>
           <div className="room-tabs">
@@ -1824,7 +1824,7 @@ function StatusTab({ student, blocks }){
       <p className="page-sub" style={{color:'var(--text)',fontWeight:600}}>비어있는 방을 확인하세요.</p>
 
       {!hours ? (
-        <div className="info-box">일요일 또는 공휴일은 학원 휴무일이에요.</div>
+        <div className="info-box">공휴일은 학원 휴무일이에요.</div>
       ) : (
         <React.Fragment>
           <div className="room-tabs">
@@ -2112,7 +2112,7 @@ function StudentTimetableTab({ student, blocks, exceptions }){
       </div>
 
       {!hours ? (
-        <div className="info-box">일요일 또는 공휴일은 학원 휴무일이에요.</div>
+        <div className="info-box">공휴일은 학원 휴무일이에요.</div>
       ) : (
         <React.Fragment>
           <div className="legend" style={{marginBottom:14}}>
@@ -2516,7 +2516,7 @@ function AdminReservationsTab(){
       </div>
 
       {!hours ? (
-        <div className="info-box">일요일 또는 공휴일은 학원 휴무일이에요.</div>
+        <div className="info-box">공휴일은 학원 휴무일이에요.</div>
       ) : (
         <div className="timetable-wrap" ref={wrapRef}>
           <table className="timetable">
