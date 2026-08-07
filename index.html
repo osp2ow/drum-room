@@ -739,8 +739,7 @@ function getOperatingHours(dateObj){
 // 합주실: 평일만, 1시~9시(13:00~21:00). 수업 시간표와 자동 연동돼요.
 function getEnsembleHours(dateObj){
   const day = dateObj.getDay();
-  if(day === 0 || isHoliday(dateObj)) return null; // 일요일·공휴일 휴무
-  if(day === 6) return { start:'13:00', end:'19:00' }; // 토요일 (김믿음 선생님 시간표와 연동)
+  if(day === 0 || day === 6 || isHoliday(dateObj)) return null; // 일요일·토요일·공휴일 휴무
   return { start:'13:00', end:'21:00' };
 }
 
