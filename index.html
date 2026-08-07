@@ -3188,7 +3188,7 @@ function AdminTimetableTab({ teacherId }){
     return ()=>unsub();
   }, [rangeStart, rangeEnd]);
 
-  const myOverrides = useMemo(()=> overrides.filter(o=> o.studentId && myStudentIds.has(o.studentId)), [overrides, myStudentIds]);
+  const myOverrides = useMemo(()=> overrides.filter(o=> o.kind==='note' || (o.studentId && myStudentIds.has(o.studentId))), [overrides, myStudentIds]);
 
   function findRegular(day, hour){
     const list = [];
@@ -3389,6 +3389,17 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
     }catch(e){ alert('메모 저장 중 오류가 발생했어요.'); setSaving(false); }
   }
 
+  async function deleteNote(){
+    if(!noteOverride) return;
+    if(!window.confirm('이 메모를 삭제할까요?')) return;
+    setSaving(true);
+    try{
+      await db.collection(COL_OVERRIDES).doc(noteOverride.id).delete();
+      setNoteText('');
+      onClose();
+    }catch(e){ alert('메모 삭제 중 오류가 발생했어요.'); setSaving(false); }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
@@ -3476,6 +3487,9 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
         <div className="input-label">메모</div>
         <textarea className="input" rows="3" placeholder="이 시간에 대한 메모를 남겨보세요" value={noteText} onChange={e=>setNoteText(e.target.value)} style={{resize:'vertical',marginBottom:8}} />
         <button className="btn btn-ghost btn-sm" disabled={saving} onClick={saveNote} style={{width:'100%'}}>저장</button>
+        {noteOverride && (
+          <button className="btn btn-danger btn-sm" disabled={saving} onClick={deleteNote} style={{width:'100%',marginTop:8}}>메모 삭제</button>
+        )}
       </div>
     </div>
   );
