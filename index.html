@@ -1524,7 +1524,7 @@ function ReserveTab({ student, blocks, exceptions }){
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 15.36-6.36L21 8M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.36 6.36L3 16M3 21v-5h5"/></svg>
         </div>
       </div>
-      <p className="page-sub">{selRoom===5 ? '합주실: 입시생 전용, 평일 1시~9시. 수업이 없거나 결석 예정인 시간만 예약 가능해요.' : (student.type==='exam' ? '입시생: 하루 최대 3시간, 한 방 2시간 연속 후 1시간 휴식 또는 다른방으로 이어서 사용' : '취미생: 하루 최대 1시간')}</p>
+      {selRoom===5 && <p className="page-sub">합주실: 입시생 전용, 평일 1시~9시. 수업이 없거나 결석 예정인 시간만 예약 가능해요.</p>}
 
       <div className="date-scroll-row">
         <div className="date-scroll" ref={dateScrollRef}>
@@ -1546,7 +1546,6 @@ function ReserveTab({ student, blocks, exceptions }){
           <span>달력으로<br/>보기</span>
         </div>
       </div>
-      <p style={{fontSize:11.5,color:'var(--text-faint)',marginTop:8,marginBottom:16}}>오늘부터 7일 이내 날짜만 예약할 수 있어요.</p>
 
       {showCalendar && (
         <DatePickerModal selDate={selDate} minDate={minDate} maxDate={maxDate}
@@ -1607,9 +1606,7 @@ function ReserveTab({ student, blocks, exceptions }){
                 <div className="legend">
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--surface-2)',border:'1px solid rgba(201,162,39,0.3)'}}/>선택 가능</div>
                   <div className="legend-item"><div className="legend-dot" style={{background:'var(--surface-3)',border:'1px solid var(--border)'}}/>예약마감</div>
-                  <div className="legend-item">🚫 규칙상 불가</div>
-                  <div className="legend-item">🔒 예약 불가(관리자 차단)</div>
-                  <div className="legend-item">⚠️ 다른 방과 중복</div>
+                  <div className="legend-item">🚫🔒⚠️ 예약 불가</div>
                 </div>
               </React.Fragment>
             )}
