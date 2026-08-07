@@ -3372,13 +3372,26 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
     setSaving(false);
   }
 
+  async function fetchNoteDocs(){
+    const snap = await db.collection(COL_OVERRIDES)
+      .where('kind','==','note')
+      .where('date','==',date)
+      .where('start','==',hour)
+      .get();
+    return snap.docs;
+  }
+
   async function saveNote(){
     setSaving(true);
     try{
-      if(noteOverride){
-        if(noteText.trim()===''){ await db.collection(COL_OVERRIDES).doc(noteOverride.id).delete(); }
-        else { await db.collection(COL_OVERRIDES).doc(noteOverride.id).update({ note: noteText.trim() }); }
-      } else if(noteText.trim() !== ''){
+      const docs = await fetchNoteDocs();
+      if(noteText.trim()===''){
+        await Promise.all(docs.map(d=>d.ref.delete()));
+      } else if(docs.length > 0){
+        await docs[0].ref.update({ note: noteText.trim() });
+        // 혹시 중복으로 남아있던 옛날 메모가 있으면 같이 정리
+        await Promise.all(docs.slice(1).map(d=>d.ref.delete()));
+      } else {
         await db.collection(COL_OVERRIDES).add({
           date, day, start:hour, end:toTime(toMin(hour)+60),
           kind:'note', note: noteText.trim(),
@@ -3386,18 +3399,18 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
         });
       }
       onClose();
-    }catch(e){ alert('메모 저장 중 오류가 발생했어요.'); setSaving(false); }
+    }catch(e){ console.error(e); alert('메모 저장 중 오류가 발생했어요.'); setSaving(false); }
   }
 
   async function deleteNote(){
-    if(!noteOverride) return;
     if(!window.confirm('이 메모를 삭제할까요?')) return;
     setSaving(true);
     try{
-      await db.collection(COL_OVERRIDES).doc(noteOverride.id).delete();
+      const docs = await fetchNoteDocs();
+      await Promise.all(docs.map(d=>d.ref.delete()));
       setNoteText('');
       onClose();
-    }catch(e){ alert('메모 삭제 중 오류가 발생했어요.'); setSaving(false); }
+    }catch(e){ console.error(e); alert('메모 삭제 중 오류가 발생했어요.'); setSaving(false); }
   }
 
   return (
