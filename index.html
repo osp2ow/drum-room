@@ -342,7 +342,7 @@
     padding:10px 4px;text-align:center;background:var(--surface-2);border-bottom:1px solid var(--border);position:sticky;top:0;
   }
   .tt-today-dot{width:5px;height:5px;border-radius:50%;background:var(--rec);margin:4px auto 0;}
-  .tt-time-h{width:54px;}
+  .tt-time-h{}
   .tt-time{
     font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--text-faint);
     text-align:center;padding:6px 2px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);white-space:nowrap;
@@ -1286,7 +1286,7 @@ function ManageReservationsModal({ student, onClose, onGoReserve }){
         </div>
         <p style={{fontSize:12.5,color:'var(--text-muted)',marginTop:0,marginBottom:16,lineHeight:1.6}}>시간을 바꾸고 싶으면 먼저 취소한 뒤 새로 예약해주세요.</p>
 
-        <div className="date-scroll" ref={scrollRef} style={{marginBottom:14}}>
+        <div className="date-scroll fit-all" ref={scrollRef} style={{marginBottom:14}}>
           {weekDates.map(d=>{
             const ds = fmtDate(d);
             const isToday = ds === todayStr;
@@ -2118,8 +2118,8 @@ function StudentTimetableTab({ student, blocks, exceptions }){
           <div className="timetable-wrap" ref={wrapRef}>
             <table className="timetable">
               <colgroup>
-                <col style={{width:'56px'}} />
-                {availableRooms.map(r=><col key={r} style={{width:`calc((100% - 56px) / ${availableRooms.length})`}} />)}
+                <col style={{width:'12%'}} />
+                {availableRooms.map(r=><col key={r} style={{width:`${88/availableRooms.length}%`}} />)}
               </colgroup>
               <thead>
                 <tr>
@@ -2495,7 +2495,7 @@ function AdminReservationsTab(){
       <div className="eyebrow">ADMIN</div>
       <h1 className="page-title">예약 일정표</h1>
       <p className="page-sub">날짜를 고르면 전체 방의 예약 현황을 한눈에 볼 수 있어요. 칸을 눌러서 예약 수정·추가, 차단 추가·해제를 할 수 있어요. (합주실은 수업 시간표와 자동 연동돼요)</p>
-      <div className="date-scroll" ref={dateScrollRef}>
+      <div className="date-scroll fit-all" ref={dateScrollRef}>
         {dates.map(d=>{
           const ds = fmtDate(d);
           const isToday = ds === fmtDate(new Date());
@@ -2515,8 +2515,8 @@ function AdminReservationsTab(){
         <div className="timetable-wrap" ref={wrapRef}>
           <table className="timetable">
             <colgroup>
-              <col style={{width:'56px'}} />
-              {ADMIN_ROOMS.map(r=><col key={r} style={{width:`calc((100% - 56px) / ${ADMIN_ROOMS.length})`}} />)}
+              <col style={{width:'12%'}} />
+              {ADMIN_ROOMS.map(r=><col key={r} style={{width:`${88/ADMIN_ROOMS.length}%`}} />)}
             </colgroup>
             <thead>
               <tr>
@@ -3255,8 +3255,8 @@ function AdminTimetableTab({ teacherId }){
       <div className="timetable-wrap" ref={wrapRef}>
         <table className="timetable class-timetable">
           <colgroup>
-            <col style={{width:'46px'}} />
-            {DAYS.map(d=><col key={d} style={{width:'calc((100% - 46px) / 5)'}} />)}
+            <col style={{width:'12%'}} />
+            {DAYS.map(d=><col key={d} style={{width:`${88/DAYS.length}%`}} />)}
           </colgroup>
           <thead>
             <tr>
