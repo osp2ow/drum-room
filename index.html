@@ -219,7 +219,9 @@
   .tab-item{
     flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
     padding:6px 2px;color:var(--text-faint);cursor:pointer;
+    border-right:1px solid var(--border);
   }
+  .tab-item:last-child{border-right:none;}
   .tab-item.active{color:var(--brass-bright);}
   .tab-item svg{width:21px;height:21px;}
   .tab-item span{font-size:10.5px;font-weight:600;font-family:var(--font-mono);letter-spacing:0.02em;}
@@ -419,6 +421,10 @@
   .date-scroll-row .date-chip{flex:1 1 0;width:auto;min-width:0;padding:11px 0;border-radius:12px;}
   .date-scroll-row .date-chip .dow{font-size:12.5px;}
   .date-scroll-row .date-chip .num{font-size:16.5px;}
+  .date-scroll.fit-all{overflow-x:visible;cursor:default;gap:5px;}
+  .date-scroll.fit-all .date-chip{flex:1 1 0;width:auto;min-width:0;padding:11px 0;border-radius:12px;}
+  .date-scroll.fit-all .date-chip .dow{font-size:12.5px;}
+  .date-scroll.fit-all .date-chip .num{font-size:16.5px;}
   .cal-toggle-btn{
     flex-shrink:0;width:58px;height:66px;border-radius:13px;background:var(--surface);
     border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
@@ -1196,7 +1202,7 @@ function HomeTab({ student, notices, onGoReserve }){
 
       <div className="card">
         <div className="card-title">🥁 나의 예약 현황</div>
-        <div className="date-scroll" ref={weekScrollRef} style={{marginBottom:14}}>
+        <div className="date-scroll fit-all" ref={weekScrollRef} style={{marginBottom:14}}>
           {weekDates.map(d=>{
             const ds = fmtDate(d);
             const isToday = ds === todayStr;
