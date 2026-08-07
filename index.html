@@ -1331,6 +1331,15 @@ function ReserveTab({ student, blocks, exceptions }){
   const [toast, setToast] = useState('');
 
   const dateObj = useMemo(()=> new Date(selDate+'T00:00:00'), [selDate]);
+  // 합주실은 요일에 따라 이용 불가할 수 있어서, 그 날 실제로 고를 수 있는 방 목록을 따로 계산해요.
+  const roomsForDate = useMemo(()=>
+    availableRooms.filter(r=> r!==5 || !!getEnsembleHours(dateObj))
+  , [availableRooms, dateObj]);
+
+  useEffect(()=>{
+    if(!roomsForDate.includes(selRoom)) setSelRoom(roomsForDate[0]);
+  }, [roomsForDate, selRoom]);
+
   const hours = useMemo(()=> selRoom===5 ? getEnsembleHours(dateObj) : getOperatingHours(dateObj), [dateObj, selRoom]);
   const slots = useMemo(()=> generateHalfHourSlots(hours), [hours]);
   const limitSlots = dailyLimitSlots(student.type);
@@ -1570,11 +1579,11 @@ function ReserveTab({ student, blocks, exceptions }){
       {selDate < RESERVATION_START_DATE ? (
         <div className="info-box">연습실 예약은 8월 1일부터 열려요. 8월 1일 이후 날짜를 선택해주세요.</div>
       ) : !hours ? (
-        <div className="info-box">{selRoom===5 ? '합주실은 평일에만 이용 가능해요. 다른 날짜를 선택해주세요.' : '일요일 또는 공휴일은 학원 휴무일이에요. 다른 날짜를 선택해주세요.'}</div>
+        <div className="info-box">일요일 또는 공휴일은 학원 휴무일이에요. 다른 날짜를 선택해주세요.</div>
       ) : (
         <React.Fragment>
           <div className="room-tabs">
-            {availableRooms.map(r=>(
+            {roomsForDate.map(r=>(
               <div key={r} className={"room-tab"+(selRoom===r?' active':'')} onClick={()=>setSelRoom(r)}>
                 <div className="rn">ROOM</div>
                 <div className="rt">{roomLabel(r)}</div>
