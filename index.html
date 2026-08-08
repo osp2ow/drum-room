@@ -1999,10 +1999,10 @@ function MyTab({ student, notices, onLogout }){
         {pushStatus==='unsupported' ? (
           <p style={{fontSize:12.5,color:'var(--text-faint)',margin:0,lineHeight:1.6}}>이 기기/브라우저에서는 알림을 지원하지 않아요. (iOS는 홈 화면에 추가한 뒤 iOS 16.4 이상에서만 가능해요)</p>
         ) : pushStatus==='on' ? (
-          <p style={{fontSize:12.5,color:'var(--brass-bright)',margin:0,fontWeight:700}}>✓ 알림이 켜져 있어요. 예약 당일 오전 10시에 알림을 보내드려요.</p>
+          <p style={{fontSize:12.5,color:'var(--brass-bright)',margin:0,fontWeight:700}}>✓ 알림이 켜져 있어요. 예약 시간 1시간 전에 알림을 보내드려요.</p>
         ) : (
           <React.Fragment>
-            <p style={{fontSize:12.5,color:'var(--text-muted)',margin:'0 0 12px',lineHeight:1.6}}>예약 당일 오전 10시에 그날 예약 안내를 받아보세요.</p>
+            <p style={{fontSize:12.5,color:'var(--text-muted)',margin:'0 0 12px',lineHeight:1.6}}>예약 시간 1시간 전에 알림을 받아보세요.</p>
             <button className="btn" disabled={pushStatus==='loading'} onClick={handleEnablePush}>{pushStatus==='loading'?'설정 중...':'알림 받기'}</button>
           </React.Fragment>
         )}
