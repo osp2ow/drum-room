@@ -630,6 +630,7 @@ const COL_BLOCKS = "juniper_blocks";
 const COL_BLOCK_EXCEPTIONS = "juniper_block_exceptions"; // 특정 날짜 하루만 차단을 해제한 기록
 const COL_OVERRIDES = "juniper_schedule_overrides";
 const COL_PUSH_SUBS = "juniper_push_subscriptions";
+const COL_SLOT_LOCKS = "juniper_slot_locks"; // 방+날짜+시간별 잠금 문서 (동시 예약 경합 방지용)
 // 웹 푸시 알림용 VAPID 공개키 (Cloud Functions 배포 시 사용한 키와 반드시 같아야 해요)
 const VAPID_PUBLIC_KEY = "BN8yN09ZKsZEVVJe1sby_dXHI1C5Q6si7xCeZh-9yPh_-vSpOwztEGvE2tD1inYhQcb8am-CC40YTZ03RovO1Sc";
 
@@ -825,6 +826,28 @@ function expandToSlots(resList){
     while(cur < end){ list.push({ room:Number(r.room), time:toTime(cur) }); cur += 30; }
   });
   return list;
+}
+
+// 예약이 취소될 때, 그 예약이 차지했던 30분 슬롯들의 잠금을 전부 풀어서 다시 예약 가능하게 해요.
+async function releaseSlotLocks(date, room, start, end){
+  let cur = toMin(start); const endMin = toMin(end);
+  const jobs = [];
+  while(cur < endMin){
+    jobs.push(db.collection(COL_SLOT_LOCKS).doc(`${date}_${room}_${toTime(cur)}`).delete().catch(()=>{}));
+    cur += 30;
+  }
+  await Promise.all(jobs);
+}
+
+// 관리자가 직접 예약을 넣어줄 때도 그 슬롯들을 잠가서, 학생이 나중에 같은 시간을 중복으로 못 잡게 해요.
+async function claimSlotLocks(date, room, start, end, studentId){
+  let cur = toMin(start); const endMin = toMin(end);
+  const jobs = [];
+  while(cur < endMin){
+    jobs.push(db.collection(COL_SLOT_LOCKS).doc(`${date}_${room}_${toTime(cur)}`).set({ studentId, date, createdAt: firebase.firestore.FieldValue.serverTimestamp() }));
+    cur += 30;
+  }
+  await Promise.all(jobs);
 }
 
 // 슬롯을 연속 구간(run)으로 묶기: [{room, start, end}, ...]
@@ -1313,7 +1336,10 @@ function ManageReservationsModal({ student, onClose, onGoReserve }){
 
   async function cancel(id){
     if(!window.confirm('이 예약을 취소할까요?')) return;
+    const snap = await db.collection(COL_RESERVATIONS).doc(id).get();
+    const data = snap.data();
     await db.collection(COL_RESERVATIONS).doc(id).delete();
+    if(data) await releaseSlotLocks(data.date, data.room, data.start, data.end);
   }
 
   return (
@@ -1485,6 +1511,8 @@ function ReserveTab({ student, blocks, exceptions }){
         });
         await batch.commit();
       }
+      // 이 30분 슬롯의 예약 잠금도 같이 풀어줘서, 다른 학생이 다시 예약할 수 있게 해요.
+      await db.collection(COL_SLOT_LOCKS).doc(`${res.date}_${room}_${time}`).delete().catch(()=>{});
     }catch(err){ alert('취소 중 오류가 발생했어요. 다시 시도해주세요.'); }
   }
 
@@ -1510,39 +1538,49 @@ function ReserveTab({ student, blocks, exceptions }){
     }
     setSubmitting(true); setMsg('');
     try{
-      await db.runTransaction(async (tx)=>{
-        // 트랜잭션 안에서 다시 확인 + 저장을 한 번에 처리해서, 다른 학생이 그 사이에 같은 시간을
-        // 예약해도 절대 겹치지 않도록 막아요 (동시 예약 경합 방지).
-        const dayQuery = db.collection(COL_RESERVATIONS).where('date','==',selDate);
-        const freshSnap = await tx.get(dayQuery);
-        const freshList = freshSnap.docs.map(d=>({id:d.id, ...d.data()}));
+      const fresh = await db.collection(COL_RESERVATIONS).where('date','==',selDate).get();
+      const freshList = fresh.docs.map(d=>({id:d.id, ...d.data()}));
 
-        const conflict = draftSlots.some(sl=>{
-          const s = toMin(sl.time), e = s+30;
-          return freshList.some(r=>r.studentId!==student.id && Number(r.room)===sl.room && toMin(r.start)<e && s<toMin(r.end));
-        });
-        if(conflict) throw new Error('CONFLICT');
+      const conflict = draftSlots.some(sl=>{
+        const s = toMin(sl.time), e = s+30;
+        return freshList.some(r=>r.studentId!==student.id && Number(r.room)===sl.room && toMin(r.start)<e && s<toMin(r.end));
+      });
+      if(conflict){ setMsg('방금 다른 학생이 예약해서 시간이 겹쳐요. 선택을 다시 확인해주세요.'); setSubmitting(false); return; }
 
-        const blockConflict = draftSlots.some(sl=>{
-          const s = toMin(sl.time), e = s+30;
-          return blocks.some(b=> Number(b.room)===sl.room && b.day===dow && toMin(b.start)<e && s<toMin(b.end));
-        });
-        if(blockConflict) throw new Error('BLOCKED');
+      const blockConflict = draftSlots.some(sl=>{
+        const s = toMin(sl.time), e = s+30;
+        return blocks.some(b=> Number(b.room)===sl.room && b.day===dow && toMin(b.start)<e && s<toMin(b.end));
+      });
+      if(blockConflict){ setMsg('선택한 시간 중 예약이 막혀있는 시간이 포함되어 있어요. 선택을 다시 확인해주세요.'); setSubmitting(false); return; }
 
-        const freshMineAll = expandToSlots(freshList.filter(r=>r.studentId===student.id));
-        const dupConflict = draftSlots.some(sl=>
-          freshMineAll.some(m=>m.time===sl.time && m.room!==sl.room) ||
-          draftSlots.some(other=>other!==sl && other.time===sl.time && other.room!==sl.room)
-        );
-        if(dupConflict) throw new Error('DUP');
+      const freshMineAll = expandToSlots(freshList.filter(r=>r.studentId===student.id));
+      const dupConflict = draftSlots.some(sl=>
+        freshMineAll.some(m=>m.time===sl.time && m.room!==sl.room) ||
+        draftSlots.some(other=>other!==sl && other.time===sl.time && other.room!==sl.room)
+      );
+      if(dupConflict){ setMsg('같은 시간에 다른 방과 중복 예약된 시간이 있어요. 선택을 다시 확인해주세요.'); setSubmitting(false); return; }
 
-        let running = freshMineAll.filter(sl=>sl.room!==5).slice();
-        for(const sl of draftSlots){
-          if(sl.room === 5) continue; // 합주실은 시간 제한 규칙 대상이 아니에요
-          if(!canAddSlot(student.type, running, sl.room, sl.time)) throw new Error('RULE');
-          running.push(sl);
+      let running = freshMineAll.filter(sl=>sl.room!==5).slice();
+      for(const sl of draftSlots){
+        if(sl.room === 5) continue; // 합주실은 시간 제한 규칙 대상이 아니에요
+        if(!canAddSlot(student.type, running, sl.room, sl.time)){
+          setMsg('예약 규칙에 맞지 않는 시간이 포함되어 있어요. 선택을 다시 확인해주세요.');
+          setSubmitting(false);
+          return;
         }
+        running.push(sl);
+      }
 
+      // 실제 저장은 30분 슬롯별 "잠금 문서"를 이용한 트랜잭션으로 처리해요.
+      // 두 학생이 정말 동시에 같은 시간을 눌러도, 잠금 문서를 먼저 차지한 쪽만 성공해요.
+      await db.runTransaction(async (tx)=>{
+        const lockRefs = draftSlots.map(sl=> db.collection(COL_SLOT_LOCKS).doc(`${selDate}_${sl.room}_${sl.time}`));
+        const lockSnaps = await Promise.all(lockRefs.map(ref=>tx.get(ref)));
+        if(lockSnaps.some(s=>s.exists)) throw new Error('LOCKED');
+
+        lockRefs.forEach(ref=>{
+          tx.set(ref, { studentId: student.id, date: selDate, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        });
         draftRuns.forEach(run=>{
           const ref = db.collection(COL_RESERVATIONS).doc();
           tx.set(ref, {
@@ -1559,20 +1597,21 @@ function ReserveTab({ student, blocks, exceptions }){
       setTimeout(()=> setToast(''), 2500);
     }catch(e){
       console.error(e);
-      const msgMap = {
-        CONFLICT: '방금 다른 학생이 예약해서 시간이 겹쳐요. 선택을 다시 확인해주세요.',
-        BLOCKED: '선택한 시간 중 예약이 막혀있는 시간이 포함되어 있어요. 선택을 다시 확인해주세요.',
-        DUP: '같은 시간에 다른 방과 중복 예약된 시간이 있어요. 선택을 다시 확인해주세요.',
-        RULE: '예약 규칙에 맞지 않는 시간이 포함되어 있어요. 선택을 다시 확인해주세요.',
-      };
-      setMsg(msgMap[e.message] || '예약 중 오류가 발생했어요. 다시 시도해주세요.');
+      if(e.message === 'LOCKED'){
+        setMsg('방금 다른 학생이 예약해서 시간이 겹쳐요. 선택을 다시 확인해주세요.');
+      } else {
+        setMsg('예약 중 오류가 발생했어요. 다시 시도해주세요.');
+      }
     }
     setSubmitting(false);
   }
 
   async function cancelReservation(id){
     if(!window.confirm('예약을 취소할까요?')) return;
+    const snap = await db.collection(COL_RESERVATIONS).doc(id).get();
+    const data = snap.data();
     await db.collection(COL_RESERVATIONS).doc(id).delete();
+    if(data) await releaseSlotLocks(data.date, data.room, data.start, data.end);
   }
 
   const upcoming = dayReservations.filter(r=>r.studentId===student.id).sort((a,b)=> toMin(a.start)-toMin(b.start));
@@ -2681,6 +2720,7 @@ function AdminCellModal({ cell, selDate, dow, onClose }){
         room: Number(room), date: selDate, start, end,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
+      await claimSlotLocks(selDate, Number(room), start, end, student.id);
       onClose();
     }catch(e){ alert('예약 추가 중 오류가 발생했어요.'); setSaving(false); }
   }
@@ -2777,12 +2817,15 @@ function ReservationEditModal({ reservation, onClose }){
     if(new Date(date+'T00:00:00').getDay() === 0){ alert('일요일은 학원 휴무일이라 예약을 등록할 수 없어요.'); return; }
     setSaving(true);
     await db.collection(COL_RESERVATIONS).doc(reservation.id).update({ room: Number(room), date, start, end });
+    await releaseSlotLocks(reservation.date, reservation.room, reservation.start, reservation.end);
+    await claimSlotLocks(date, Number(room), start, end, reservation.studentId);
     setSaving(false);
     onClose();
   }
   async function del(){
     if(!window.confirm('이 예약을 취소할까요?')) return;
     await db.collection(COL_RESERVATIONS).doc(reservation.id).delete();
+    await releaseSlotLocks(reservation.date, reservation.room, reservation.start, reservation.end);
     onClose();
   }
 
