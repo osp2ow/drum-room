@@ -1276,8 +1276,8 @@ function PushPromptModal({ student, onClose }){
       <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
         <div className="modal-handle"/>
         <div style={{textAlign:'center',fontSize:34,marginBottom:10}}>🔔</div>
-        <div style={{textAlign:'center',fontFamily:'var(--font-display)',fontWeight:800,fontSize:17,marginBottom:8}}>예약 알림을 받아보세요</div>
-        <p style={{textAlign:'center',fontSize:13,color:'var(--text-muted)',lineHeight:1.6,marginBottom:20}}>예약한 시간 1시간 전에 알려드려요.<br/>깜빡하고 놓치는 일이 없게 지금 켜두세요.</p>
+        <div style={{textAlign:'center',fontFamily:'var(--font-display)',fontWeight:800,fontSize:17,marginBottom:8}}>연습실 예약 1시간 전에 알려드려요</div>
+        <p style={{textAlign:'center',fontSize:13,color:'var(--text-muted)',lineHeight:1.6,marginBottom:20}}>연습실 예약, 깜빡하지 않게 알려드려요.</p>
         <button className="btn" disabled={loading} onClick={handleAllow}>{loading?'설정 중...':'알림 받기'}</button>
         <button className="btn btn-ghost" style={{marginTop:8}} onClick={onClose}>나중에 할게요</button>
       </div>
