@@ -3299,7 +3299,10 @@ function AdminTimetableTab({ teacherId }){
     return ()=>unsub();
   }, [rangeStart, rangeEnd]);
 
-  const myOverrides = useMemo(()=> overrides.filter(o=> o.kind==='note' || (o.studentId && myStudentIds.has(o.studentId))), [overrides, myStudentIds]);
+  const myOverrides = useMemo(()=> overrides.filter(o=>
+    (o.kind==='note' && (o.teacherId || MAIN_TEACHER_ID)===myTeacherId) ||
+    (o.studentId && myStudentIds.has(o.studentId))
+  ), [overrides, myStudentIds, myTeacherId]);
 
   function findRegular(day, hour){
     const list = [];
@@ -3319,7 +3322,7 @@ function AdminTimetableTab({ teacherId }){
     const regularIds = regularEntries.map(en=>en.id);
     const absenceOverrides = overrides.filter(o=> o.kind==='absence' && o.start===hour && (o.date===date || o.date===nextDate) && regularIds.includes(o.studentId));
     const makeupOverrides = overrides.filter(o=>o.kind==='makeup' && o.start===hour && (o.date===date || o.date===nextDate) && o.studentId && myStudentIds.has(o.studentId));
-    const noteOverride = overrides.find(o=>o.kind==='note' && o.date===date && o.start===hour) || null;
+    const noteOverride = overrides.find(o=>o.kind==='note' && o.date===date && o.start===hour && (o.teacherId || MAIN_TEACHER_ID)===myTeacherId) || null;
     return { day, dayIdx, date, nextDate, hour, regularEntries, absenceOverrides, makeupOverrides, noteOverride };
   }
 
@@ -3412,12 +3415,12 @@ function AdminTimetableTab({ teacherId }){
         {nowTop!=null && <div className="tt-now-line" style={{top:nowTop}}><span className="tt-now-dot"/></div>}
       </div>
 
-      {editingCell && <SlotOverrideModal cell={editingCell} students={students} overrides={myOverrides} onClose={()=>setEditingCell(null)} />}
+      {editingCell && <SlotOverrideModal cell={editingCell} students={students} overrides={myOverrides} myTeacherId={myTeacherId} onClose={()=>setEditingCell(null)} />}
     </div>
   );
 }
 
-function SlotOverrideModal({ cell, students, overrides, onClose }){
+function SlotOverrideModal({ cell, students, overrides, myTeacherId, onClose }){
   const { day, dayIdx, hour, date } = cell;
   const [saving, setSaving] = useState(false);
   const [manualName, setManualName] = useState('');
@@ -3489,7 +3492,7 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
       .where('date','==',date)
       .where('start','==',hour)
       .get();
-    return snap.docs;
+    return snap.docs.filter(d => (d.data().teacherId || MAIN_TEACHER_ID) === myTeacherId);
   }
 
   async function saveNote(){
@@ -3505,7 +3508,7 @@ function SlotOverrideModal({ cell, students, overrides, onClose }){
       } else {
         await db.collection(COL_OVERRIDES).add({
           date, day, start:hour, end:toTime(toMin(hour)+60),
-          kind:'note', note: noteText.trim(),
+          kind:'note', note: noteText.trim(), teacherId: myTeacherId,
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       }
