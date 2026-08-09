@@ -2590,7 +2590,6 @@ function AdminReservationsTab(){
     <div className="screen" style={{maxWidth:480, margin:'0 auto'}}>
       <div className="eyebrow">ADMIN</div>
       <h1 className="page-title">예약 일정표</h1>
-      <p className="page-sub">날짜를 고르면 전체 방의 예약 현황을 한눈에 볼 수 있어요. 칸을 눌러서 예약 수정·추가, 차단 추가·해제를 할 수 있어요. (합주실은 수업 시간표와 자동 연동돼요)</p>
       <div className="date-scroll fit-all" ref={dateScrollRef}>
         {dates.map(d=>{
           const ds = fmtDate(d);
@@ -2932,7 +2931,6 @@ function AdminBlocksTab({ teacherId }){
       <h1 className="page-title">{isMainAdmin ? '예약 차단 · 공휴일 관리' : '예약 차단 관리'}</h1>
 
       <div className="card-title" style={{margin:'4px 0 4px'}}>🔒 예약 차단 관리</div>
-      <p className="page-sub">매주 특정 요일·시간대에 특정 방을 예약할 수 없도록 지속적으로 막아둘 수 있어요. (예: 매주 금요일 1~3시, 5~7시에 2번방 차단)</p>
       <button className="btn" style={{marginBottom:18}} onClick={()=>setAdding(true)}>+ 새 차단 추가</button>
       {blocks.length===0 ? (
         <div className="empty-state"><div className="icon">🔓</div><p>등록된 차단이 없어요.</p></div>
@@ -2949,7 +2947,6 @@ function AdminBlocksTab({ teacherId }){
       {isMainAdmin && (
         <React.Fragment>
           <div className="card-title" style={{margin:'28px 0 4px'}}>📅 공휴일 관리</div>
-          <p className="page-sub" style={{marginBottom:14}}>공휴일은 기본적으로 예약이 막혀요. 이 날 정상 영업하려면 눌러서 "영업"으로 바꿔주세요.</p>
           {upcomingHolidays.length===0 ? (
             <div className="empty-state"><p>다가오는 공휴일이 없어요.</p></div>
           ) : (
