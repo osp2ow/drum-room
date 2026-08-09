@@ -160,8 +160,10 @@
   .toggle-opt{
     flex:1;text-align:center;padding:12px;border-radius:11px;border:1px solid var(--border);
     background:var(--surface-2);color:var(--text-muted);font-size:13.5px;font-weight:600;cursor:pointer;
+    transition:transform .1s ease;
   }
   .toggle-opt.active{border-color:var(--brass);color:var(--brass-bright);background:var(--brass-soft);}
+  .toggle-opt:active{transform:scale(0.96);}
 
   .tag{
     display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
@@ -220,9 +222,11 @@
     flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
     padding:6px 2px;color:var(--text-faint);cursor:pointer;
     border-right:1px solid var(--border);
+    transition:transform .1s ease;
   }
   .tab-item:last-child{border-right:none;}
   .tab-item.active{color:var(--brass-bright);}
+  .tab-item:active{transform:scale(0.92);}
   .tab-item svg{width:21px;height:21px;}
   .tab-item span{font-size:11.5px;font-weight:600;font-family:var(--font-mono);letter-spacing:0.02em;}
 
@@ -287,7 +291,9 @@
   .date-chip{
     flex-shrink:0;width:58px;padding:11px 0;border-radius:13px;text-align:center;
     background:var(--surface);border:1px solid var(--border);cursor:pointer;
+    transition:transform .1s ease;
   }
+  .date-chip:active{transform:scale(0.93);}
   .date-chip.active{background:var(--brass);border-color:var(--brass);}
   .date-chip .dow{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--text-muted);}
   .date-chip.active .dow{color:rgba(255,255,255,0.9);}
@@ -300,7 +306,9 @@
   .room-tab{
     flex:1;text-align:center;padding:13px 4px;border-radius:12px;border:1px solid var(--border);
     background:var(--surface);cursor:pointer;
+    transition:transform .1s ease;
   }
+  .room-tab:active{transform:scale(0.95);}
   .room-tab.active{border-color:var(--brass);background:var(--brass-soft);}
   .room-tab .rn{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);}
   .room-tab.active .rn{color:var(--brass);}
@@ -399,7 +407,8 @@
   .res-row .res-sub{font-size:11px;color:var(--text-faint);margin-top:2px;}
   .res-row .cancel-x{color:var(--text-faint);font-size:18px;cursor:pointer;padding:4px 8px;}
 
-  .notice-item{padding:16px;border-radius:14px;background:var(--surface);border:1px solid var(--border);margin-bottom:12px;}
+  .notice-item{padding:16px;border-radius:14px;background:var(--surface);border:1px solid var(--border);margin-bottom:12px;transition:transform .1s ease;}
+  .notice-item:active{transform:scale(0.98);}
   .notice-item.important{border-color:rgba(47,191,175,0.4);background:linear-gradient(160deg, var(--brass-soft), var(--surface) 60%);}
   .notice-title{font-family:var(--font-display);font-weight:700;font-size:14.5px;margin-bottom:6px;display:flex;align-items:center;gap:7px;}
   .notice-date{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);margin-bottom:8px;}
@@ -468,7 +477,9 @@
   .list-item-row{
     display:flex;align-items:center;justify-content:space-between;padding:13px 14px;
     background:var(--surface-2);border:1px solid var(--border);border-radius:12px;margin-bottom:9px;cursor:pointer;
+    transition:transform .1s ease;
   }
+  .list-item-row:active{transform:scale(0.98);}
   .list-item-row .name{font-weight:600;font-size:14px;}
   .list-item-row .meta{font-size:11px;color:var(--text-faint);margin-top:3px;}
   .chev{color:var(--text-faint);}
