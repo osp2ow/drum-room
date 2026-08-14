@@ -684,6 +684,19 @@ async function enablePushNotifications(student){
   }
 }
 
+function pushPromptDismissKey(studentId){ return 'juniper_push_prompt_dismissed_'+studentId; }
+
+// 홈/예약 탭 공통: 알림을 아직 안 켰고, "다시 보지 않기"도 안 눌렀으면 true
+async function checkShouldShowPushPrompt(studentId){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+  if(Notification.permission === 'denied') return false;
+  if(localStorage.getItem(pushPromptDismissKey(studentId))) return false;
+  const reg = await navigator.serviceWorker.getRegistration();
+  if(!reg) return true;
+  const sub = await reg.pushManager.getSubscription();
+  return !sub;
+}
+
 /* ============================================================
    HELPERS
    ============================================================ */
@@ -1148,15 +1161,7 @@ function HomeTab({ student, notices, onGoReserve }){
   const [showPushPrompt, setShowPushPrompt] = useState(false);
 
   useEffect(()=>{
-    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return; // 지원 안 하는 기기는 그냥 안 띄워요
-    if(Notification.permission === 'denied') return; // 이미 거부한 경우엔 계속 띄워도 소용없어요
-    navigator.serviceWorker.getRegistration().then(reg=>{
-      if(reg){
-        reg.pushManager.getSubscription().then(sub=>{ if(!sub) setShowPushPrompt(true); });
-      } else {
-        setShowPushPrompt(true); // 서비스 워커 자체가 없으면 = 알림을 아직 한 번도 안 켠 상태
-      }
-    });
+    checkShouldShowPushPrompt(student.id).then(should=>{ if(should) setShowPushPrompt(true); });
   }, [student.id]);
 
   useEffect(()=>{
@@ -1305,6 +1310,11 @@ function PushPromptModal({ student, onClose }){
     onClose();
   }
 
+  function handleDismissForever(){
+    localStorage.setItem(pushPromptDismissKey(student.id), '1');
+    onClose();
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
@@ -1314,6 +1324,7 @@ function PushPromptModal({ student, onClose }){
         <p style={{textAlign:'center',fontSize:13,color:'var(--text-muted)',lineHeight:1.6,marginBottom:20}}>연습실 예약, 깜빡하지 않게 알려드려요.</p>
         <button className="btn" disabled={loading} onClick={handleAllow}>{loading?'설정 중...':'알림 받기'}</button>
         <button className="btn btn-ghost" style={{marginTop:8}} onClick={onClose}>나중에 할게요</button>
+        <div style={{textAlign:'center',marginTop:14,fontSize:12,color:'var(--text-faint)',textDecoration:'underline',cursor:'pointer'}} onClick={handleDismissForever}>다시 보지 않기</div>
       </div>
     </div>
   );
@@ -1412,6 +1423,11 @@ function ReserveTab({ student, blocks, exceptions }){
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState('');
+  const [showPushPrompt, setShowPushPrompt] = useState(false);
+
+  useEffect(()=>{
+    checkShouldShowPushPrompt(student.id).then(should=>{ if(should) setShowPushPrompt(true); });
+  }, [student.id]);
 
   const dateObj = useMemo(()=> new Date(selDate+'T00:00:00'), [selDate]);
   // 합주실은 요일에 따라 이용 불가할 수 있어서, 그 날 실제로 고를 수 있는 방 목록을 따로 계산해요.
@@ -1760,6 +1776,9 @@ function ReserveTab({ student, blocks, exceptions }){
           </div>
         ))}
       </div>
+      {showPushPrompt && (
+        <PushPromptModal student={student} onClose={()=>setShowPushPrompt(false)} />
+      )}
     </div>
   );
 }
