@@ -3315,10 +3315,21 @@ function AdminTimetableTab({ teacherId }){
     return ()=>unsub();
   }, [rangeStart, rangeEnd]);
 
-  const myOverrides = useMemo(()=> overrides.filter(o=>
-    (o.kind==='note' && (o.teacherId || MAIN_TEACHER_ID)===myTeacherId) ||
-    (o.studentId && myStudentIds.has(o.studentId))
-  ), [overrides, myStudentIds, myTeacherId]);
+  // 메모는 특정 날짜가 아니라 요일(매주 반복)에 붙는 거라, 주간 범위와 상관없이 항상 전체를 구독해요.
+  const [noteOverrides, setNoteOverrides] = useState([]);
+  useEffect(()=>{
+    const unsub = db.collection(COL_OVERRIDES)
+      .where('kind','==','note')
+      .onSnapshot(snap=>{
+        setNoteOverrides(snap.docs.map(d=>({id:d.id,...d.data()})));
+      }, err=>console.error(err));
+    return ()=>unsub();
+  }, []);
+
+  const myOverrides = useMemo(()=> [
+    ...noteOverrides.filter(o=> (o.teacherId || MAIN_TEACHER_ID)===myTeacherId),
+    ...overrides.filter(o=> o.studentId && myStudentIds.has(o.studentId))
+  ], [overrides, noteOverrides, myStudentIds, myTeacherId]);
 
   function findRegular(day, hour){
     const list = [];
@@ -3338,7 +3349,7 @@ function AdminTimetableTab({ teacherId }){
     const regularIds = regularEntries.map(en=>en.id);
     const absenceOverrides = overrides.filter(o=> o.kind==='absence' && o.start===hour && (o.date===date || o.date===nextDate) && regularIds.includes(o.studentId));
     const makeupOverrides = overrides.filter(o=>o.kind==='makeup' && o.start===hour && (o.date===date || o.date===nextDate) && o.studentId && myStudentIds.has(o.studentId));
-    const noteOverride = overrides.find(o=>o.kind==='note' && o.date===date && o.start===hour && (o.teacherId || MAIN_TEACHER_ID)===myTeacherId) || null;
+    const noteOverride = overrides.find(o=>o.kind==='note' && o.day===day && o.start===hour && (o.teacherId || MAIN_TEACHER_ID)===myTeacherId) || null;
     return { day, dayIdx, date, nextDate, hour, regularEntries, absenceOverrides, makeupOverrides, noteOverride };
   }
 
@@ -3453,7 +3464,7 @@ function SlotOverrideModal({ cell, students, overrides, myTeacherId, onClose }){
   }
 
   const makeupOverrides = overrides.filter(o=>o.kind==='makeup' && o.start===hour && (o.date===weekDate(0) || o.date===weekDate(1)));
-  const noteOverride = overrides.find(o=>o.kind==='note' && o.date===date && o.start===hour) || null;
+  const noteOverride = overrides.find(o=>o.kind==='note' && o.day===day && o.start===hour) || null;
 
   const dateObj = new Date(date+'T00:00:00');
   const dateLabel = `${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 (${day}) ${hourLabel12(hour)}`;
@@ -3505,7 +3516,7 @@ function SlotOverrideModal({ cell, students, overrides, myTeacherId, onClose }){
   async function fetchNoteDocs(){
     const snap = await db.collection(COL_OVERRIDES)
       .where('kind','==','note')
-      .where('date','==',date)
+      .where('day','==',day)
       .where('start','==',hour)
       .get();
     return snap.docs.filter(d => (d.data().teacherId || MAIN_TEACHER_ID) === myTeacherId);
@@ -3627,7 +3638,7 @@ function SlotOverrideModal({ cell, students, overrides, myTeacherId, onClose }){
           {(()=>{ const d = new Date(weekDate(makeupWeek)+'T00:00:00'); return `${d.getMonth()+1}월 ${d.getDate()}일`; })()} {hourLabel12(hour)} 보강으로 지정
         </button>
 
-        <div className="input-label">메모</div>
+        <div className="input-label">메모 (매주 {day}요일 {hourLabel12(hour)}에 계속 표시돼요)</div>
         <textarea className="input" rows="3" placeholder="이 시간에 대한 메모를 남겨보세요" value={noteText} onChange={e=>setNoteText(e.target.value)} style={{resize:'vertical',marginBottom:8}} />
         <button className="btn btn-ghost btn-sm" disabled={saving} onClick={saveNote} style={{width:'100%'}}>저장</button>
         {noteOverride && (
